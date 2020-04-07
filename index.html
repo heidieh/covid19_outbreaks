@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+<head>
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-74703713-3"></script>
+	<script>
+		window.dataLayer = window.dataLayer || [];
+		function gtag(){dataLayer.push(arguments);}
+		gtag('js', new Date());
+		gtag('config', 'UA-74703713-3');
+	</script>
+
+	<meta charset="utf-8">
+	<title>Coronaviz</title>
+	<link rel="stylesheet" type="text/css" href="./css/main.css" />
+	<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/dc/3.2.1/dc.min.css" />
+	<!-- Bootstrap CSS -->
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">	
+	
+</head>
+
+<body>
+	
+	<div id="topbar" class="row">
+		<span class="topbar-left">COVID-19 Outbreak Playground</span>
+		<span class="topbar-right" id="update_date"></span>
+	</div>
+
+	<section id="header" class="row">
+		<span id="title">Compare Coronavirus Outbreaks by Location</span>
+	</section>
+
+	<div class="container-fluid">
+
+		<div class="row">
+			<!-- <div class="col-md-6 bg-warning"> -->
+			<div id="locationChartGroup" class="col-md-6 col-lg-5 col-xl-4">
+				<p class="heading">1. Select locations to compare:</p>
+				<p class='instruction'>Click on bars to <b>select</b> or <b>de-select</b> locations <i>(scroll to see all locations in lower chart)</i></p>
+				<div id="loc-type-btns">
+					<button id="loc-type-death-btn" class="button custom-btn custom-btn-2" onclick="viewLocChartBy('death')">Deaths</button>
+					<button id="loc-type-conf-btn" class="button custom-btn custom-btn-1 on" onclick="viewLocChartBy('confirmed')">Confirmed Cases</button>		
+				</div>
+				<div id="loc-type-chart-a"></div>
+				<div id="chart-with-sticky-axis">
+					<div id="loc-type-chart-b"></div>
+					<div id="loc-type-chart-b-axis"></div>
+				</div>
+			</div>
+
+			<!-- <div class="col-md-6 bg-info"> -->
+			<div id="outbreakChartGroup" class="col-md-6 col-lg-7 col-xl-8">
+				<p class="heading">2. Define outbreak start to compare locations:</p>
+				<!-- <p class='instruction'>Day 1 of an outbreak is the first day that <b><span id="outbreak_day1_num"></span> <span id="outbreak_day1_type"></span></b> are registered on that day.</p>			 -->
+				<p class='instruction'>Day 1 of an outbreak is the first day that <select id="ob_day1_num" onchange="changeOutbreakNum(value)"></select><select id="ob_day1_type" onchange="changeOutbreakType(value)"></select> are registered on that day. The end of an outbreak is when the Day 1 criteria are not fulfilled for 14 consecutive days.</p>			
+				<div class="ob-button-group">
+					<div id="outbreak-total-btns">
+						<button id="outbreak-total-cum-btn" class="button custom-btn custom-btn-2" onclick="viewOutbreakDayAccum('cumulative')">Cumulative</button>		
+						<button id="outbreak-total-daily-btn" class="button custom-btn custom-btn-1 on" onclick="viewOutbreakDayAccum('daily')">Daily</button>		
+					</div>
+					<div id="outbreak-type-btns">
+						<button id="outbreak-type-death-btn" class="button custom-btn custom-btn-2" onclick="viewOutbreakChartBy('death')">Deaths</button>
+						<button id="outbreak-type-conf-btn" class="button custom-btn custom-btn-1 on" onclick="viewOutbreakChartBy('confirmed')">Confirmed Cases</button>		
+					</div>
+				</div>
+				<div id="outbreakDay-chart"></div>
+				<div id="outbreakDay-legend"></div>
+			
+			</div>
+						
+		</div>
+
+
+
+		<div class="row">
+			<div id="timeSeriesChartGroup" class="col-12 col-sm-12">
+				<div class="tS-button-group">
+					<div id="timeSeries-total-btns">
+						<button id="timeSeries-total-cum-btn" class="button custom-btn custom-btn-2" onclick="viewTimeSeriesAccum('cumulative')">Cumulative</button>		
+						<button id="timeSeries-total-daily-btn" class="button custom-btn custom-btn-1 on" onclick="viewTimeSeriesAccum('daily')">Daily</button>		
+					</div>	
+					<div id="timeSeries-type-btns">
+						<button id="timeSeries-type-death-btn" class="button custom-btn custom-btn-2" onclick="viewTimeSeriesChartBy('death')">Deaths</button>
+						<button id="timeSeries-type-conf-btn" class="button custom-btn custom-btn-1 on" onclick="viewTimeSeriesChartBy('confirmed')">Confirmed Cases</button>		
+					</div>
+				</div>
+				<div id="timeseries-chart"></div>
+			</div>
+			
+			<!-- <div class="col-sm-2">
+				<div id="timeseries-legend"></div>
+			</div> -->
+		</div>
+
+		<div class="row">
+			<div id="footer" class="col-12 col-sm-12">
+				<span id="data-source"></span>
+				<span id="contact-info">Contact: &nbsp;<a href="mailto:heidi.elhosaini@gmail.com"><i>heidi.elhosaini@gmail.com</i></a></span>
+				
+			</div>
+		</div>
+
+	</div>
+
+
+	<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.15.0/d3.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.1.0/papaparse.min.js"></script>
+
+	<script src="./data/country_codes.json" type="text/javascript"></script>
+	<script src="./js/main.js" type="text/javascript"></script>
+		
+</body>
+</html>
