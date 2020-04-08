@@ -28,7 +28,8 @@ window.onresize = resize;
 //
 //**************************************************************************************************//
 
-let dataFormat = 'rk';   //hdx / rk
+
+let dataFormat = 'hdx';   //hdx / rk
 let dataSource = 'John Hopkins University Center for Systems Science and Engineering (JHU CCSE)';
 
 let outbreakDay1Num = 10;
@@ -59,6 +60,7 @@ let locationList = [];
 let locationErrorList = [];
 let selectedLocList = [];
 let minDate, maxDate;
+// let tempHoverLoc = null;
 
 let yellowHighlight = '#fee227';
 let chartGrey = '#e9e9e9';
@@ -229,7 +231,7 @@ function processHDXData(origConfCasesData, origDeathsData) {
 	//let formattedDateStrLong = formatDate(maxDate, 'long');
 	//let formattedDateStr = formatDate(maxDate, 'long');
 	//document.getElementById('max-date').innerHTML = formatDate(maxDate, 'short');
-	document.getElementById('update_date').innerHTML = 'Data updated: <i>' + formatDate(maxDate, 'long') + '</i>';
+	document.getElementById('update_date').innerHTML = 'Data to: <i>' + formatDate(maxDate, 'long') + '</i>';
 	
 
 
@@ -256,8 +258,8 @@ function processHDXData(origConfCasesData, origDeathsData) {
 				prev_value = locRecord['cumVal'];				
 			})
 
-
-			temp_locArray_deaths = temp_locArray.filter(rec => rec.type === 'deaths').sort(function(a, b) {
+			prev_value = 0;
+			temp_locArray_deaths = temp_locArray.filter(rec => rec.type === 'death').sort(function(a, b) {
 				return a.date - b.date;
 			});
 			//console.log('temp_locArray_deaths: ', temp_locArray_deaths)
@@ -354,7 +356,7 @@ function processData(origData) {
 	//console.log('minDate, maxDate: ', minDate, maxDate)
 	//let formattedDateStr = formatDate(maxDate, 'long');
 	//document.getElementById('max-date').innerHTML = formatDate(maxDate, 'short');
-	document.getElementById('update_date').innerHTML = 'Data updated: <i>' + formatDate(maxDate, 'long') + '</i>';
+	document.getElementById('update_date').innerHTML = 'Data to: <i>' + formatDate(maxDate, 'long') + '</i>';
 
 	// console.log('final location list: ', locationList)
 	// console.log('countries not found ISO3: ', locationErrorList)
@@ -868,19 +870,27 @@ function createCharts(data) {
 		// Create Event Handlers for mouse
 		function handleMouseOver_a(d, i) {  // Add interactivity
 			//console.log('handleMouseOver_a ', d, i, this)
+			// tempHoverLoc = d.key;
+			// console.log('tempHoverLoc: ', tempHoverLoc)
 			d3.select('#bar_a_' + d.key).attr('fill', yellowHighlight)
 			d3.select('#bar_overlay_a_' + d.key).attr("fill-opacity",  0.5)
 			select_bar_label_a(d).attr('style', "font-family: sans-serif; font-size: 0.75rem; font-weight:").text('\u00A0'+formatNumber(d.value));
 			select_axis_label_a(d).attr('style', "font-weight: bold;");
+			//updateOutbreakDayChart();
+			//updateTimeSeriesChart();
 		}		  
 
         function handleMouseOut_a(d, i) {
+			// tempHoverLoc = null;
+			// console.log('tempHoverLoc: ', tempHoverLoc)
 			//d3.select('#bar_a_' + d.key).attr('fill', colorPicker(d.value))
 			//d3.select('#bar_a_' + d.key).attr('fill', '#666666')
 			d3.select('#bar_a_' + d.key).attr('fill', getBarColor(d.key, true))
 			d3.select('#bar_overlay_a_' + d.key).attr("fill-opacity",  0)
 			select_bar_label_a(d).attr('style', "font-weight: regular;").text('');
 			select_axis_label_a(d).attr('style', "font-weight: regular;");
+			//updateOutbreakDayChart();
+			//updateTimeSeriesChart();
 		}
 		  
 		function handleMouseClick_a(d, i) {  // Add interactivity
@@ -905,19 +915,27 @@ function createCharts(data) {
 		// Create Event Handlers for mouse
 		function handleMouseOver_b(d, i) {  // Add interactivity
 			//console.log('handleMouseOver_b ', d, i, this)
+			// tempHoverLoc = d.key;
+			// console.log('tempHoverLoc: ', tempHoverLoc)
 			d3.select('#bar_b_' + d.key).attr('fill', yellowHighlight)
 			d3.select('#bar_overlay_b_' + d.key).attr("fill-opacity",  0.5)
 			select_bar_label_b(d).attr('style', "font-family: sans-serif; font-size: 0.75rem; font-weight:").text('\u00A0'+formatNumber(d.value));
-			select_axis_label_b(d).attr('style', "font-weight: bold;");		
+			select_axis_label_b(d).attr('style', "font-weight: bold;");	
+			//updateOutbreakDayChart();
+			//updateTimeSeriesChart();	
 		}
 			
 		function handleMouseOut_b(d, i) {
+			// tempHoverLoc = null;
+			// console.log('tempHoverLoc: ', tempHoverLoc)
 			//d3.select('#bar_b_' + d.key).attr('fill', colorPicker(d.value))
 			//d3.select('#bar_b_' + d.key).attr('fill', '#a3a3a3')
 			d3.select('#bar_b_' + d.key).attr('fill', getBarColor(d.key, false))
 			d3.select('#bar_overlay_b_' + d.key).attr("fill-opacity",  0)	
 			select_bar_label_b(d).attr('style', "font-weight: regular;").text('');
 			select_axis_label_b(d).attr('style', "font-weight: regular;");
+			//updateOutbreakDayChart();
+			//updateTimeSeriesChart();	
 		}
 			
 		function handleMouseClick_b(d, i) {  // Add interactivity
@@ -1944,6 +1962,7 @@ function updateTimeSeriesChart() {
 			
 		})
 	    .attr("stroke", function(d) {
+			//if (d.locCode == tempHoverLoc) d3.select(this).raise();
 			//pos = selectedLocList.indexOf(d.locCode);
 			if (selectedLocList.indexOf(d.locCode) != -1)  d3.select(this).raise();
 			//console.log('color pos: ', pos, colors[pos])
@@ -1951,6 +1970,7 @@ function updateTimeSeriesChart() {
 			return getLocationColor(d.locCode);
 		})
 	    .attr("stroke-width", function(d) {
+			// if (d.locCode == tempHoverLoc) return 2;
 			pos = selectedLocList.indexOf(d.locCode);
 			//console.log('color pos: ', pos, colors[pos])
 			return (selectedLocList.indexOf(d.locCode) == -1) ? 1 : 2;
@@ -2239,6 +2259,7 @@ function updateOutbreakDayChart() {
 		})
 	    .attr("stroke", function(d) {
 			//pos = selectedLocList.indexOf(d.locCode);
+			// if (d.locCode == tempHoverLoc) d3.select(this).raise();
 			if (selectedLocList.indexOf(d.locCode) != -1)  d3.select(this).raise();
 			//console.log('color pos: ', pos, colors[pos])
 			//return (pos==-1)? chartGrey : colors[pos];
@@ -2246,6 +2267,7 @@ function updateOutbreakDayChart() {
 		})
 	    .attr("stroke-width", function(d) {
 			//console.log('selectedLocList: ', selectedLocList.length, selectedLocList.filter(l => l != null).length, selectedLocList)
+			// if (d.locCode == tempHoverLoc) return 2;
 			pos = selectedLocList.indexOf(d.locCode);
 			//console.log('color pos: ', pos, colors[pos])
 			//return (selectedLocList.indexOf(d.locCode) == -1) ? 0 : 2;
@@ -3167,6 +3189,7 @@ function sameDay(d1, d2) {
 function getLocationColor(loc) {
 	//console.log('getLocationColor: ', loc, selectedLocList)
 	if (loc == null) return chartGrey;
+	//if (loc == tempHoverLoc) return yellowHighlight;
 	let pos = selectedLocList.indexOf(loc);
 	if (pos != -1) {
 		//console.log('getLocationColor: ', loc, selectedLocList)
@@ -3314,10 +3337,16 @@ function changeOutbreakNum(opt) {
 
 
 $(document).ready(function () {
+	
+	
+	
 
 	document.getElementById('data-source').innerHTML = 'Data source: <i>' + dataSource + '</i>';
 
 	if (dataFormat == 'hdx') {		// Get raw data from HDX: 
+
+		$('#modalLoadingData').modal('show');
+
 		var d1 = $.ajax({		//confirmed cases
 			type: 'GET',
 			url: 'https://data.humdata.org/hxlproxy/data/download/time_series_covid19_confirmed_global_narrow.csv?dest=data_edit&filter01=explode&explode-header-att01=date&explode-value-att01=value&filter02=rename&rename-oldtag02=%23affected%2Bdate&rename-newtag02=%23date&rename-header02=Date&filter03=rename&rename-oldtag03=%23affected%2Bvalue&rename-newtag03=%23affected%2Binfected%2Bvalue%2Bnum&rename-header03=Value&filter04=clean&clean-date-tags04=%23date&filter05=sort&sort-tags05=%23date&sort-reverse05=on&filter06=sort&sort-tags06=%23country%2Bname%2C%23adm1%2Bname&tagger-match-all=on&tagger-default-tag=%23affected%2Blabel&tagger-01-header=province%2Fstate&tagger-01-tag=%23adm1%2Bname&tagger-02-header=country%2Fregion&tagger-02-tag=%23country%2Bname&tagger-03-header=lat&tagger-03-tag=%23geo%2Blat&tagger-04-header=long&tagger-04-tag=%23geo%2Blon&header-row=1&url=https%3A%2F%2Fraw.githubusercontent.com%2FCSSEGISandData%2FCOVID-19%2Fmaster%2Fcsse_covid_19_data%2Fcsse_covid_19_time_series%2Ftime_series_covid19_confirmed_global.csv',
@@ -3342,20 +3371,23 @@ $(document).ready(function () {
 		//$.when(d1).then(function (a1) {
 		$.when(d1, d2, d3).then(function (a1, a2, a3) {
 			console.log('Ajax calls succeedeed');
-			//console.log('raw data confirmed: ', a1)
-			//console.log('raw data deaths: ', a2)
+			// console.log('raw data confirmed: ', a1)
+			// console.log('raw data deaths: ', a2)
 
 			countryCodes = a3[0];
 			//console.log('country codes: ', countryCodes)
 			let parsedConfirmedCasesData = Papa.parse(a1[0], {header: true, transformHeader: transformHDXHeader})
 			let parsedDeathsData = Papa.parse(a2[0], {header: true, transformHeader: transformHDXHeader})
-			//console.log('parsed CONFIRMED CASES data: ', parsedConfirmedCasesData)
-			//console.log('parsed DEATHS data: ', parsedDeathsData)
+			// console.log('parsed CONFIRMED CASES data: ', parsedConfirmedCasesData)
+			// console.log('parsed DEATHS data: ', parsedDeathsData)
 			let processedData = processHDXData(parsedConfirmedCasesData.data, parsedDeathsData.data)
-			//console.log('processed data: ', processedData)
+			// console.log('processed data: ', processedData)
 			
 			calculateOutbreakDay1(processedData);
 			createCharts(processedData);
+
+			$('#loader').addClass("hide-loader");
+			$('#modalLoadingData').modal('hide');
 			
 
 		}, function (jqXHR, textStatus, errorThrown) {
