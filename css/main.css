@@ -290,3 +290,35 @@ path {
 .hoverCircle, .o_hoverCircle {
 	opacity: .75;
 }
+
+
+/*   Modal & Loader  */
+
+#loader {
+  /* margin-left: 10.5rem; */
+  margin: 2rem 2rem;
+  align-self: center;
+  border: 1rem solid #f3f3f3; /* Light grey */
+  border-top: 1rem solid #3498db; /* Blue */
+  border-radius: 50%;
+  width: 8rem;
+  height: 8rem;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+#loading-text {
+  align-self: center;
+  margin-top: 0rem;
+  margin-bottom: 2rem;
+  color: #595959;
+  font-size: 1rem;
+}
+
+.hide-loader{
+  display:none;
+}
