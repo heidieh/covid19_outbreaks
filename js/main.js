@@ -29,7 +29,7 @@ window.onresize = resize;
 //**************************************************************************************************//
 
 
-let dataFormat = 'rk';   //hdx / rk
+let dataFormat = 'hdx';   //hdx / rk
 let dataSource = 'John Hopkins University Center for Systems Science and Engineering (JHU CCSE)';
 
 let outbreakDay1Num = 10;
