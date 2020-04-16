@@ -1,5 +1,10 @@
 //"use strict";
 window.onresize = resize;
+// console.log('screen.height: ', screen.height)  //Device screen height (i.e. all physically visible stuff)
+// console.log('screen.availHeight: ', screen.availHeight) //** Work with this one ** //Device screen height minus the operating system taskbar (if present)
+// console.log('window.innerHeight: ', window.innerHeight) //The current document's viewport height, minus taskbars, etc.
+// console.log('window.outerHeight: ', window.outerHeight) //Height the current window visibly takes up on screen (including taskbars, menus, etc.); Note: When the window is maximized this will equal screen.availHeight
+const screenHeight = screen.availHeight;
 
 //**************************************************************************************************//
 //
@@ -14,8 +19,10 @@ window.onresize = resize;
 // 
 // TO DO:
 // - check China (Hubei) stats for outbreak start
-// - add data loader
 // - code clean-up
+//
+// - * responsive height - incl height of top10 chart
+// - issue with hdx data import (sometimes?)
 //
 // LATER:
 // - add option to select by date
@@ -25,6 +32,8 @@ window.onresize = resize;
 // - display list of countries defined as having an outbreak & start days
 // - sum locations into whole countries?
 // - add hover highlight lines to charts
+// - add option to view regional US stats
+// - add percentage change view?
 //
 //**************************************************************************************************//
 
@@ -35,7 +44,10 @@ let dataSource = 'John Hopkins University Center for Systems Science and Enginee
 let outbreakDay1Num = 10;
 let outbreakDay1Type = 'confirmed';  // type = confirmed/death
 let outbreakNumDaysUnfulfilledForEndDay = 14;  //i.e. 2 weeks incubation
-let outbreakDay1MaxNumForDropdown= 20;
+//let outbreakDay1MaxNumForDropdown= 20;
+let outbreakDay1ArrayForDropdown = [1,2,3,4,5,10,15,20,25,50,100];
+
+//let numDaysForRollingAvgPercChange = 14;
 
 
 let statTypeOptions = [ {key: 'confirmed', text: 'confirmed cases', textCamel: 'Confirmed Cases'}, 
@@ -43,16 +55,19 @@ let statTypeOptions = [ {key: 'confirmed', text: 'confirmed cases', textCamel: '
 						];  
 let accumTypeOptions = [ {key: 'daily', dKey: 'value', text: 'daily', textCamel: 'Daily' }, 
 						 {key: 'cumulative', dKey: 'cumVal', text: 'cumulative', textCamel: 'Cumulative' }
-					   ]							  
+						 //{key: 'percChange', dKey: 'percChange', text: '% change', textCamel: '% Change' }
+					   ]	
+let outbreakScaleType = 'linear'; //log/linear	
+let timeSeriesScaleType = 'linear'; //log/linear				  
 
-							  
+//initial views						  
 let chartView = {
 	locRowChart: { viewStatType: 'confirmed' },
 	outbreakChart: { viewStatType: 'confirmed', viewAccumType: 'daily' },  
 	timeSeriesChart: { viewStatType: 'confirmed', viewAccumType: 'daily' }
 }
 //let viewStatType = 'confirmed';   	// typeStatType = confirmed/death			
-//let viewAccumType = 'daily';		// viewAccumType = daily/cumul	  
+//let viewAccumType = 'daily';		// viewAccumType = daily/cumulative/percChange
 						  
 let countryCodes;
 let allData;
@@ -62,10 +77,10 @@ let selectedLocList = [];
 let minDate, maxDate;
 // let tempHoverLoc = null;
 
-let yellowHighlight = '#fee227';
-let chartGrey = '#e9e9e9';
-let barDark = '#c0b1b1';
-let barLight = '#d2c7c7';
+let yellowHighlight = '#fee227'; //=rgb(254,226,39)
+let chartGrey = '#e9e9e9';  //=rgb(233,233,233)
+let barDark = '#c0b1b1';    //=rgb(192,177,177)
+let barLight = '#d2c7c7';   //=rgb(210,199,199)
 
 //let colors = [...d3.schemeCategory10, ...d3.schemeAccent];  //18 unique colors
 //colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#7fc97f", "#beaed4", "#fdc086", "#ffff99", "#386cb0", "#f0027f", "#bf5b17", "#666666"]
@@ -90,17 +105,18 @@ const id5 = '#outbreakDay-legend';
 let svgDimensions = {};
 svgDimensions[id1a] = {width: $(id1a).width(), height: 174}
 svgDimensions[id1b] = {width: $(id1b).width(), height: 3000}
-svgDimensions[id2] = {width: $(id2).width(), height: 130}
+svgDimensions[id2] = {width: $(id2).width(), height: 148}
 svgDimensions[id3] = {width: 180, height: 160}
 svgDimensions[id4] = {width: $(id4).width(), height: 320}
 svgDimensions[id5] = {width: $(id5).width(), height: 76}
+//console.log('locationChart full width x height (no margins) ', $(id1a).width(), ' x ', $(id1a).height())
 
 let margin = {}; 
 margin[id1a] = {top: 50, bottom: 6, left: 125, right: 50}
 margin[id1b] = {top: 25, bottom: 10, left: 125, right: 50}
-margin[id2] = {top: 20, bottom: 30, left: 100, right: 50}
+margin[id2] = {top: 34, bottom: 30, left: 100, right: 50}
 margin[id3] = {top: 10, bottom: 10, left: 2, right: 2}
-margin[id4] = {top: 20, bottom: 50, left: 60, right: 50}
+margin[id4] = {top: 34, bottom: 50, left: 60, right: 50}
 margin[id5] = {top: 10, bottom: 10, left: 12, right: 12}
 
 
@@ -145,8 +161,6 @@ let width5 = svgDimensions[id5].width - margin[id5].left - margin[id5].right, //
 function processHDXData(origConfCasesData, origDeathsData) {
 	// console.log('original ConfCasesData in processData: ', origConfCasesData)
 	// console.log('original DeathsData in processData: ', origDeathsData)
-	//let processedCaseData = [];
-	//let processedDeathData = [];
 	let processedData = [];
 	let locCode, currentLocCode;
 	let temp;
@@ -273,7 +287,6 @@ function processHDXData(origConfCasesData, origDeathsData) {
 		
 	})
 
-
 	// console.log('final location list: ', locationList)
 	// console.log('countries not found ISO3: ', locationErrorList)
 	// console.log('final processed data: ', processedData)
@@ -284,9 +297,10 @@ function processHDXData(origConfCasesData, origDeathsData) {
 
 
 function processData(origData) {
-	//console.log('originalData in processData: ', origData)	
-	//console.log('location list: ', locationList)
-	//console.log('country codes in processData: ', countryCodes)
+	// console.log('-------------- PROCESS DATA: -----------------')
+	// console.log('originalData in processData: ', origData)	
+	// console.log('location list: ', locationList)
+	// console.log('country codes in processData: ', countryCodes)
 	let processedData = [];
 	let locCode, currentLocCode;
 	let temp;
@@ -300,33 +314,37 @@ function processData(origData) {
 		if ((!(record.hasOwnProperty('country'))) || (!(record.hasOwnProperty('date')))) {
 			console.log("ERROR - entry not included: ", i, record)
 		} else {
-			//add location to list of locations using ISO3 and assigned regional code
-			locCode = addLocationToListAndGetLocCode(record['country'], record['region'], record['lat'], record['lon'])
-			//console.log('locCode: ', locCode)
-			currentLocCode = processedData.find(d => d.locCode === locCode);
-			//console.log('currentLocCode', currentLocCode)
-			if (currentLocCode == undefined) {
-				temp = {}
-				temp['locCode'] = locCode;
-				temp['values'] = [];
-				temp['values'].push({
-					date: new Date (record['date']),
-					value: parseInt(record['value']),
-					type: record['type']
-				})
-				processedData.push(temp)
-			} else {
-				currentLocCode['values'].push({
-					date: new Date (record['date']),
-					value: parseInt(record['value']),
-					type: record['type']
-				})
-			}
+			//only keep confirmed & death data
+			if ((record['type'] == 'confirmed') || (record['type'] == 'death')) {
+
+				//add location to list of locations using ISO3 and assigned regional code
+				locCode = addLocationToListAndGetLocCode(record['country'], record['region'], record['lat'], record['lon'])
+				//console.log('locCode: ', locCode)
+				currentLocCode = processedData.find(d => d.locCode === locCode);
+				//console.log('currentLocCode', currentLocCode)
+				if (currentLocCode == undefined) {
+					temp = {}
+					temp['locCode'] = locCode;
+					temp['values'] = [];
+					temp['values'].push({
+						date: new Date (record['date']),
+						value: parseInt(record['value']),
+						type: record['type']
+					})
+					processedData.push(temp)
+				} else {
+					currentLocCode['values'].push({
+						date: new Date (record['date']),
+						value: parseInt(record['value']),
+						type: record['type']
+					})
+				}
+			}		
 		
 		}
 	});
 
-	//console.log('PROCESSED DATA before: ', processedData)
+	//sort by data type (confirmed/deaths), then by date
 	processedData.forEach(loc => loc.values.sort(function (loc1, loc2) {
 		if (loc1.type > loc2.type) return 1;
 		if (loc1.type < loc2.type) return -1;
@@ -334,34 +352,84 @@ function processData(origData) {
 		if (loc1.date < loc2.date) return -1;
 	}));
 
+	//calculate cumulative values
 	let cumCas, cumDeath;
 	processedData.forEach(loc => {
 		cumCas = 0;
 		cumDeath = 0;
 		loc['values'].forEach(vals => {
 			if (vals['type'] == 'confirmed') {
+				// if (cumCas + vals['value'] < 0) vals['cumVal'] = 0;  //don't allow cumulative total to fall below zero
+				// else vals['cumVal'] = cumCas + vals['value'];
 				vals['cumVal'] = cumCas + vals['value'];
 				cumCas = vals['cumVal'];
 			} else if (vals['type'] == 'death') {
+				// if (cumDeath + vals['value'] < 0) vals['cumVal'] = 0;  //don't allow cumulative total to fall below zero
+				// else vals['cumVal'] = cumDeath + vals['value'];
 				vals['cumVal'] = cumDeath + vals['value'];
 				cumDeath = vals['cumVal'];
 			}
 		})
 	})
+
+	// //calculate percentage change values (with 5 day rolling average)
+	// let percChangeCas, percChangeDeath;
+	// let rollingAvgCases = [], rollingAvgDeaths = [];
+	// let rollAvgCase, rollAvgDeath;
+	// processedData.forEach(loc => {
+	// 	rollAvgCase = 0;
+	// 	rollAvgDeath = 0;
+	// 	// if (loc['locCode'] == 'ITA_1') console.log('--ITALY--')
+	// 	// if (loc['locCode'] == 'ITA_1') console.log('rollAvgCase: ', rollAvgCase)
+	// 	rollingAvgCases = [];
+	// 	rollingAvgDeaths = [];
+	// 	loc['values'].forEach(vals => {
+	// 		if (vals['type'] == 'confirmed') {	
+	// 			if (rollingAvgCases.length == numDaysForRollingAvgPercChange) {
+	// 				rollAvgCase = rollingAvgCases.reduce((a,b) => a + b, 0) / rollingAvgCases.length;
+	// 				if ((rollAvgCase == 0) && (vals['cumVal'] == 0)) {
+	// 					vals['percChange'] = 0
+	// 				} else if (rollAvgCase == 0) {
+	// 					vals['percChange'] = null
+	// 				} else {
+	// 					vals['percChange'] = (vals['cumVal'] - rollAvgCase) / rollAvgCase;
+	// 				}
+	// 				rollingAvgCases.pop();	//remove element from end of array
+	// 			} else {
+	// 				vals['percChange'] = null;
+	// 			}
+	// 			rollingAvgCases.unshift(vals['cumVal']);  //add element to beginning of array
+				
+	// 		} else if (vals['type'] == 'death') {
+	// 			if (rollingAvgDeaths.length == numDaysForRollingAvgPercChange) {
+	// 				rollAvgDeath = rollingAvgDeaths.reduce((a,b) => a + b, 0) / rollingAvgDeaths.length;
+
+	// 				if ((rollAvgDeath == 0) && (vals['cumVal'] == 0)) {
+	// 					vals['percChange'] = 0
+	// 				} else if (rollAvgDeath == 0) {
+	// 					vals['percChange'] = null
+	// 				} else {
+	// 					vals['percChange'] = (vals['cumVal'] - rollAvgDeath) / rollAvgDeath;
+	// 				}
+	// 				rollingAvgDeaths.pop();
+	// 			} else {
+	// 				vals['percChange'] = null;
+	// 			}
+	// 			rollingAvgDeaths.unshift(vals['cumVal']);
+	// 		}
+	// 	})
+	// })
 	
+	//get & set date extent of all data
 	let datesArrStr = [...new Set(origData.map(d => d.date))];
 	let datesArr = datesArrStr.filter(d => d !== undefined).map(d => new Date(d));
 	maxDate = new Date(Math.max.apply(null, datesArr));
 	minDate = new Date(Math.min.apply(null, datesArr));
-	//console.log('minDate, maxDate: ', minDate, maxDate)
-	//let formattedDateStr = formatDate(maxDate, 'long');
-	//document.getElementById('max-date').innerHTML = formatDate(maxDate, 'short');
 	document.getElementById('update_date').innerHTML = 'Data to: <i>' + formatDate(maxDate, 'long') + '</i>';
 
-	// console.log('final location list: ', locationList)
+	//console.log('final location list: ', locationList)
 	// console.log('countries not found ISO3: ', locationErrorList)
-	// console.log('final processed data: ', processedData)
-
+	//console.log('*** final processed data: ', processedData)
 	return processedData;
 }
 
@@ -526,7 +594,10 @@ function addLocationToListAndGetLocCode(countryName, regionName, latVal, lonVal)
 	let countryISO3 = countryCodes.find(cntry => cntry.name === countryName)
 	let ISO3 = (countryISO3 === undefined)? getISO3() : countryISO3['alpha-3']
 	let locsInCountry = locationList.filter(loc => loc.iso3 === ISO3)
-	let exactLoc = locationList.find(loc => loc.iso3 === ISO3 && loc.country === countryName && loc.region === regionName && loc.lat === latVal && loc.lon === lonVal)	
+	
+	let exactLoc = locationList.find(loc => {		
+		return loc.iso3 === ISO3 && loc.country === countryName && loc.region === regionName && sameLoc(loc.lat, latVal) && sameLoc(loc.lon, lonVal)
+	})	
 	let locCode;
 
 	if (exactLoc === undefined) {
@@ -539,25 +610,31 @@ function addLocationToListAndGetLocCode(countryName, regionName, latVal, lonVal)
 			region: regionName, //assign own code id here
 			regionCode: regionCode,
 			code: locCode, 
-			lat: latVal, 
-			lon: lonVal
+			lat: parseFloat(latVal).toFixed(2), 
+			lon: parseFloat(lonVal).toFixed(2)
 		}
-
+		//console.log('new exactLoc: ', exactLoc)
 		locationList.push(exactLoc)
 	} else {
+		//console.log('already exists exactLoc: ', exactLoc)
 		locCode = exactLoc['code']
+	}
+
+	function sameLoc(val1, val2) {
+		return parseFloat(val1).toFixed(2) === parseFloat(val2).toFixed(2);
 	}
 
 	return locCode;
 
 }
 
+
 function differenceInDays(day1, day2) {
 	return (day2 - day1) / (1000 * 3600 * 24);
 };
 
 function formatNumber(num) {
-    return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
+	return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
 }
 
 
@@ -567,9 +644,26 @@ function getBarSpacing(bar_height) {  //***!!!needs checking */
 
 
 
+// function isinLocRowTopTen(locCode) {
+// 	let locTotal, locValues;
+// 	data.forEach(d => {
+// 		locValues = d.values;
+// 		locTotal = statTotalPerLoc.find(t => (t.key === d['locCode']));
+// 		locValues.forEach(v => {
+// 			locTotal['value'] += (v['type'] === chartView.locRowChart.viewStatType) ? v['value'] : 0;		
+// 		})
+// 		if (locTotal['value'] < 0) locTotal['value'] = 0; 
+// 	});
+// 	statTotalPerLoc.sort(function(a,b) { return a.value - b.value })   //descending order by value (cases)
+// 	//console.log('*** statTotalPerLoc: ', statTotalPerLoc)
+
+// 	let statTotalPerLoc_a = statTotalPerLoc.slice(statTotalPerLoc.length-10,statTotalPerLoc.length);  //top 10
+// 	let statTotalPerLoc_b = statTotalPerLoc.slice(0, statTotalPerLoc.length-10);				//without top 10
+// }
+
 
 function createCharts(data) {
-	console.log('data for createCharts: ', data)
+	//console.log('data for createCharts: ', data)
 	    //sample data record: 
 		//  {  locCode: "CHN_7"
 		//     values:  {  date: Wed Jan 22 2020 01:00:00 GMT+0100 (Central European Standard Time) {}
@@ -592,9 +686,9 @@ function createCharts(data) {
 		locValues = d.values;
 		locTotal = statTotalPerLoc.find(t => (t.key === d['locCode']));
 		locValues.forEach(v => {
-			locTotal['value'] += (v['type'] === chartView.locRowChart.viewStatType) ? v['value'] : 0;
-		
+			locTotal['value'] += (v['type'] === chartView.locRowChart.viewStatType) ? v['value'] : 0;		
 		})
+		if (locTotal['value'] < 0) locTotal['value'] = 0; 
 	});
 	statTotalPerLoc.sort(function(a,b) { return a.value - b.value })   //descending order by value (cases)
 	//console.log('*** statTotalPerLoc: ', statTotalPerLoc)
@@ -773,16 +867,13 @@ function createCharts(data) {
 		locRowChart_a
 			.append('text')
 			.attr("class", "top10")
-			.attr("transform", "translate(" + (-80) + "," + (-10) + ")") 
+			.attr("transform", "translate(" + (-100) + "," + (0) + ")") 
 			//.attr("text-anchor", "middle")
 			// .attr("font-size", '0.9rem')
 			// .style("stroke-color", "#ffff00")
 			// .style("opacity", 1)
 			.text('TOP 10')
 			
-
-
-		
 		locRowChart_b.selectAll(".bar_b")
 			.data(statTotalPerLoc_b)
 			.enter().append("rect")
@@ -874,7 +965,7 @@ function createCharts(data) {
 			// console.log('tempHoverLoc: ', tempHoverLoc)
 			d3.select('#bar_a_' + d.key).attr('fill', yellowHighlight)
 			d3.select('#bar_overlay_a_' + d.key).attr("fill-opacity",  0.5)
-			select_bar_label_a(d).attr('style', "font-family: sans-serif; font-size: 0.75rem; font-weight:").text('\u00A0'+formatNumber(d.value));
+			select_bar_label_a(d).attr('style', "font-family: sans-serif; font-size: 0.75rem; font-weight: regular").text('\u00A0'+formatNumber(d.value));
 			select_axis_label_a(d).attr('style', "font-weight: bold;");
 			//updateOutbreakDayChart();
 			//updateTimeSeriesChart();
@@ -907,7 +998,15 @@ function createCharts(data) {
 
 		function select_bar_label_a(d) {
 			//console.log('select_bar_label d: ', d)
-			return d3.select('#bar_lbl_a_'+d.key)
+			return d3.select('#bar_lbl_a_' + d.key)
+		}
+
+		function select_bar_b(d) {
+			return d3.select('#bar_b_' + d.key)
+		}
+
+		function select_bar_overlay_b(d) {
+			return d3.select('#bar_overlay_b_' + d.key)
 		}
 
 
@@ -917,25 +1016,33 @@ function createCharts(data) {
 			//console.log('handleMouseOver_b ', d, i, this)
 			// tempHoverLoc = d.key;
 			// console.log('tempHoverLoc: ', tempHoverLoc)
-			d3.select('#bar_b_' + d.key).attr('fill', yellowHighlight)
-			d3.select('#bar_overlay_b_' + d.key).attr("fill-opacity",  0.5)
-			select_bar_label_b(d).attr('style', "font-family: sans-serif; font-size: 0.75rem; font-weight:").text('\u00A0'+formatNumber(d.value));
+
+			// d3.select('#bar_b_' + d.key).attr('fill', yellowHighlight)			
+			// d3.select('#bar_overlay_b_' + d.key).attr("fill-opacity",  0.5)
+
+			select_bar_b(d).attr('fill', yellowHighlight)
+			select_bar_overlay_b(d).attr("fill-opacity",  0.5)
+
+			select_bar_label_b(d).attr('style', "font-family: sans-serif; font-size: 0.75rem; font-weight:regular").text('\u00A0'+formatNumber(d.value));
 			select_axis_label_b(d).attr('style', "font-weight: bold;");	
 			//updateOutbreakDayChart();
 			//updateTimeSeriesChart();	
+			//console.log('handleMouseOver done: ', this)
 		}
 			
 		function handleMouseOut_b(d, i) {
+			//console.log('handleMouseOut_b ', d, i, this)
 			// tempHoverLoc = null;
 			// console.log('tempHoverLoc: ', tempHoverLoc)
 			//d3.select('#bar_b_' + d.key).attr('fill', colorPicker(d.value))
 			//d3.select('#bar_b_' + d.key).attr('fill', '#a3a3a3')
-			d3.select('#bar_b_' + d.key).attr('fill', getBarColor(d.key, false))
-			d3.select('#bar_overlay_b_' + d.key).attr("fill-opacity",  0)	
+			select_bar_b(d).attr('fill', getBarColor(d.key, false))
+			select_bar_overlay_b(d).attr("fill-opacity",  0)	
 			select_bar_label_b(d).attr('style', "font-weight: regular;").text('');
 			select_axis_label_b(d).attr('style', "font-weight: regular;");
 			//updateOutbreakDayChart();
 			//updateTimeSeriesChart();	
+			//console.log('handleMouseOut done: ', this)
 		}
 			
 		function handleMouseClick_b(d, i) {  // Add interactivity
@@ -955,6 +1062,7 @@ function createCharts(data) {
 			return d3.select('#bar_lbl_b_'+d.key)
 		}
 
+
 	
 		//add x-axis titles
 		locRowChart_a
@@ -967,6 +1075,25 @@ function createCharts(data) {
 
 // ************* CREATE TIMESERIES CHART ***************** //
 
+		//add scale btns if accumulator type is cumulative
+		let timeSeriesAccumType = accumTypeOptions.find(acc => acc.key == chartView.timeSeriesChart.viewAccumType).dKey;
+		//console.log('timeSeriesAccumType: ', timeSeriesAccumType, chartView.timeSeriesChart.viewAccumType)
+
+		let tSScaleBtnHTML = "";
+		tSScaleBtnHTML = "<button id='timeseries-scale-log-btn' class='button scale-btn custom-btn custom-btn-2' onclick='changeTimeSeriesScale(\"log\")'>Log</button>";
+		tSScaleBtnHTML += "<button id='timeseries-scale-linear-btn' class='button scale-btn custom-btn custom-btn-1' onclick='changeTimeSeriesScale(\"linear\")'>Linear</button>";
+		
+		if (!(chartView.timeSeriesChart.viewAccumType == 'cumulative')) {
+			document.getElementById('timeSeries-scale-btns').style.display = 'none';
+		}
+		document.getElementById('timeSeries-scale-btns').innerHTML = tSScaleBtnHTML;
+		if (timeSeriesScaleType == 'linear') {
+			document.getElementById('timeseries-scale-linear-btn').classList.add('on');
+		} else if (timeSeriesScaleType == 'log') {
+			document.getElementById('timeseries-scale-log-btn').classList.add('on');
+		}
+
+
 		//Render main SVGs
 		svg2 = d3.select(id2)
 			.append("svg")
@@ -975,9 +1102,22 @@ function createCharts(data) {
 			.style("background", 'white');
 
 	
-		var x2 = d3.scaleTime().range([0, width2]), //x-axis width, accounting for specified margins
-			y2 = d3.scaleLinear().range([height2, 0])
-			//ylet = d3.scaleLinear().range([height2, 0]),
+		let x2 = d3.scaleTime().range([0, width2]); //x-axis width, accounting for specified margins
+		//let y2 = d3.scaleLinear().range([height2, 0])
+		let y2 = function() {
+			if (chartView.timeSeriesChart.viewAccumType == 'daily') {
+				return d3.scaleLinear().range([height2, 0]);;
+			} else {
+				switch(timeSeriesScaleType) {
+						case 'linear': return d3.scaleLinear().range([height2, 0]);
+						case 'log': return d3.scaleLog().range([height2, 0]);
+						case 'default': return d3.scaleLinear().range([height2, 0]);
+				};
+			}		
+		}();
+
+
+
 	
 		let x2Axis = d3.axisBottom(x2).tickFormat(d3.timeFormat('%b %d')),
 			y2Axis = d3.axisLeft(y2).ticks(5).tickFormat(function(d) {
@@ -991,12 +1131,15 @@ function createCharts(data) {
 			// 		return formatNumber((d*100).toFixed(1))+'%';
 			// 	}
 			// });
+			
 	
 		svg2.append("defs").append("clipPath")
 			.attr("id", "clip-ts")
 			.append("rect")
 			.attr("width", width2)
-			.attr("height", height2);
+			//.attr("height", height2)
+			.attr("height", height2 + 2)		//so lines at very top of domain not cut off
+			.attr("transform", "translate(0,-2)")
 	
 		timeSeriesChart = svg2.append("g")
 			.attr("class", "timeSeriesChart")
@@ -1007,13 +1150,46 @@ function createCharts(data) {
 		x2.domain([minDate,maxDate]);
 		//console.log('x2.domain = ', x2.domain())
 		
-		//console.log('data for y2 domain: ', data);
-		let domainMaxArr = [];
-		domainMaxArr = data.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec.value : undefined)).filter(v => v != undefined);  //max value for each location for selected statType
-		//console.log('domainMaxArr: ', domainMaxArr)
-		y2.domain([0, d3.max(domainMaxArr) ]); //.nice();
-		//y2.domain([0,1000]); 
+		
+		
+		//FOR Y-DOMAIN: get max value for selectedData (or if empty then for data)
+		//let timeSeriesAccumType = accumTypeOptions.find(acc => acc.key === chartView.timeSeriesChart.viewAccumType).dKey;
+		// let timeSeriesDomainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.timeSeriesChart.viewStatType) ? rec[timeSeriesAccumType] : undefined));  //max value for all locations
+		// //console.log('timeSeriesDomainArrayMax: ', timeSeriesDomainArrayMax)
+		// y2.domain([0, d3.max(timeSeriesDomainArrayMax) ]); 
+		// console.log('y2.domain: ', y2.domain())
+
+		//let timeSeriesAccumType = accumTypeOptions.find(acc => acc.key === chartView.timeSeriesChart.viewAccumType).dKey;
+		let timeSeriesDomainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.timeSeriesChart.viewStatType) ? rec[timeSeriesAccumType] : undefined));  //max value for all locations
+
+		let tSDomainMax = d3.max(timeSeriesDomainArrayMax);
+		//cumulative log, value <= 5 or no values for selection:
+		if (((timeSeriesDomainArrayMax.length == 0)||(tSDomainMax <= 5)) && (chartView.timeSeriesChart.viewAccumType == 'cumulative') && (timeSeriesScaleType == 'log')) {
+			y2.domain([1, 5]); 
+		//cumulative log, value > 0:
+		} else if ((timeSeriesScaleType == 'log') && (chartView.timeSeriesChart.viewAccumType == 'cumulative')) {
+			y2.domain([1, tSDomainMax]); 
+		//value <= 5 or no values for selection - keep a min of 5 for y-axis:
+		} else if ((timeSeriesDomainArrayMax.length == 0) || (tSDomainMax <= 5)) {
+			y2.domain([0, 5]);
+		} else {
+			y2.domain([0, tSDomainMax]); 
+		}
 		//console.log('y2.domain = ', y2.domain())
+
+
+
+
+
+		//console.log('data for y2 domain: ', data);
+		// let timeSeriesAccumType = accumTypeOptions.find(acc => acc.key == chartView.timeSeriesChart.viewAccumType).dKey;
+		// 	console.log('timeSeriesAccumType: ', timeSeriesAccumType)
+		// let domainMaxArr = [];
+		// domainMaxArr = data.map(d => d3.max(d.values, rec => (rec.type === chartView.timeSeriesChart.viewStatType) ? rec.value : undefined)).filter(v => v != undefined);  //max value for each location for selected statType
+		// //console.log('domainMaxArr: ', domainMaxArr)
+		// y2.domain([0, d3.max(domainMaxArr) ]); //.nice();
+		// //y2.domain([0,1000]); 
+		// //console.log('y2.domain = ', y2.domain())
 
 
 
@@ -1030,8 +1206,22 @@ function createCharts(data) {
 		//console.log('y_ts_title: ', y_ts_title)
 		timeSeriesChart.append("text")
 			.attr("class", "y-axis-title")
-			.attr("transform", "rotate(-90) translate(-102, -50)")  //axis rotated and left of chart 
-			.text(y_ts_title)
+			.attr("transform", function() {
+				if ((chartView.timeSeriesChart.viewStatType === 'confirmed') && (chartView.timeSeriesChart.viewAccumType === "daily")) {
+					return "rotate(-90) translate(-92, -50)"
+				} else if ((chartView.timeSeriesChart.viewStatType === 'death') && (chartView.timeSeriesChart.viewAccumType === "daily")) {
+					return "rotate(-90) translate(-70, -50)" 
+				} else if ((chartView.timeSeriesChart.viewStatType === 'confirmed') && (chartView.timeSeriesChart.viewAccumType === "cumulative")) {
+					return "rotate(-90) translate(-110, -50)" 
+				} else if ((chartView.timeSeriesChart.viewStatType === 'death') && (chartView.timeSeriesChart.viewAccumType === "cumulative")) {
+					return "rotate(-90) translate(-86, -50)" 
+				} else {
+					return "" 
+				}
+			})  
+			.text(y_ts_title);
+
+		
 
 
 
@@ -1051,8 +1241,6 @@ function createCharts(data) {
 
 
 
-
-
 		timeSeriesChart.append("g")
 			.attr('class', 'locLines')
 			.attr("clip-path", "url(#clip-ts)");
@@ -1062,11 +1250,28 @@ function createCharts(data) {
 		const locationLine = d3.line()
 			.curve(d3.curveMonotoneX)
 			.x(function(d) { return x2(d['date']); })  //rename to x2Scale???
-			.y(function(d) { return y2(d['value']); });  //rename to y2Scale???
-			
+			//.y(function(d) { return y2(d['value']); });  //rename to y2Scale???
+			//.y(function(d) { return y2(d[timeSeriesAccumType]); });  //rename to y2Scale???
+			.y(function(d) { 
+				//console.log('locationLine: ', d[timeSeriesAccumType], ' -> ', y2(d[timeSeriesAccumType])); 
+				// if (d[timeSeriesAccumType] <= 0) return height2 + 10;
+				// else return y2(d[timeSeriesAccumType]); 
 
-		//HEIDI - READ http://datawanderings.com/2019/10/28/tutorial-making-a-line-chart-in-d3-js-v-5/
+				if ((chartView.timeSeriesChart.viewAccumType == 'cumulative')&& (timeSeriesScaleType == 'log')) {
+					//console.log('y: ', d[currentAccumType], ' -> ', d[currentAccumType] <= 0 ? height4 : y4(d[currentAccumType]));
+					return d[timeSeriesAccumType] <= 0 ? height2 + 10 : y2(d[timeSeriesAccumType]); 
+				} else {
+					return y2(d[timeSeriesAccumType]); 
+				}
+
+			}); 
+			
+			//.y(function(d) { return d[timeSeriesAccumType] <= 0 ? 0 : y2(d[timeSeriesAccumType]); }); 
+			//.y(function(d) { console.log('locationLine: ', d[timeSeriesAccumType], ' -> ', y2(d[timeSeriesAccumType])); return d[timeSeriesAccumType]<=0? 0 : y2(d[timeSeriesAccumType]); });  //rename to y4Scale???
+
 		
+
+
 		// Draw lines
 		//console.log('data for timeseries chart: ', data)
 		const lines = timeSeriesChart.selectAll('.locLines').selectAll("lines")
@@ -1080,11 +1285,9 @@ function createCharts(data) {
 				//console.log('assign line class: ', d.locCode)
 				return 'line line-' + d.locCode;
 			})
-			//.attr("d", function(d) { return locationLine(d.values); });  //d.values should be the array of object datapoints for a location e.g. [{date: xxx, value: yyy}, {date: xxx, value: yyy}, ...]
 			.attr("d", function(d) {   //with filter
-				//console.log('for line path: ', d.values.filter(rec => rec['type'] == 'confirmed')); 
-				return locationLine(d.values.filter(rec => rec['type'] == 'confirmed')); //locationLine should receive array of object datapoints for a location e.g. [{date: xxx, value: yyy}, {date: xxx, value: yyy}, ...]
-				
+				//console.log('for line path: ', d.values.filter(rec => rec['type'] == chartView.outbreakChart.viewStatType)); 
+				return locationLine(d.values.filter(rec => rec['type'] == chartView.timeSeriesChart.viewStatType)); //locationLine should receive array of object datapoints for a location e.g. [{date: xxx, value: yyy}, {date: xxx, value: yyy}, ...]
 			})
 			.attr("stroke", function(d) {
 				//console.log('need color for: ', d.locCode)
@@ -1159,6 +1362,27 @@ function createCharts(data) {
 
 // ************* CREATE OUTBREAK DAY CHART ***************** //
 
+		//add scale btns if accumulator type is cumulative
+		//let currentAccumType = accumTypeOptions.find(acc => acc.key == chartView.outbreakChart.viewAccumType).dKey;
+		//console.log('currentAccumType: ', currentAccumType, chartView.outbreakChart.viewAccumType)
+
+		let scaleBtnHTML = "";
+		//if (chartView.outbreakChart.viewAccumType == 'cumulative') {
+			scaleBtnHTML = "<button id='outbreak-scale-log-btn' class='button scale-btn custom-btn custom-btn-2' onclick='changeOutbreakScale(\"log\")'>Log</button>";
+			scaleBtnHTML += "<button id='outbreak-scale-linear-btn' class='button scale-btn custom-btn custom-btn-1' onclick='changeOutbreakScale(\"linear\")'>Linear</button>";
+		//}
+		if (!(chartView.outbreakChart.viewAccumType == 'cumulative')) {
+			document.getElementById('outbreak-scale-btns').style.display = 'none';
+		}
+		document.getElementById('outbreak-scale-btns').innerHTML = scaleBtnHTML;
+		if (outbreakScaleType == 'linear') {
+			document.getElementById('outbreak-scale-linear-btn').classList.add('on');
+		} else if (outbreakScaleType == 'log') {
+			document.getElementById('outbreak-scale-log-btn').classList.add('on');
+		}
+		
+
+
 		//Render main SVGs
 		svg4 = d3.select(id4)
 			.append("svg")
@@ -1167,8 +1391,20 @@ function createCharts(data) {
 			.style("background", 'white');
 
 	
-		var x4 = d3.scaleLinear().range([0, width4]), //x-axis width, accounting for specified margins
-			y4 = d3.scaleLinear().range([height4, 0])
+		let x4 = d3.scaleLinear().range([0, width4]); //x-axis width, accounting for specified margins
+		let y4 = function() {
+			if (chartView.outbreakChart.viewAccumType == 'daily') {
+				return d3.scaleLinear().range([height4, 0]);;
+			} else {
+				switch(outbreakScaleType) {
+						case 'linear': return d3.scaleLinear().range([height4, 0]);
+						case 'log': return d3.scaleLog().range([height4, 0]);
+						case 'default': return d3.scaleLinear().range([height4, 0]);
+				};
+			}		
+		}();
+		//y4 = d3.scaleLinear().range([height4, 0])
+		//y4 = d3.scaleLog().range([height4, 0])
 	
 		let x4Axis = d3.axisBottom(x4).tickFormat(function(d) {
 				return formatNumber(d.toFixed(0));  
@@ -1193,8 +1429,12 @@ function createCharts(data) {
 			.attr("id", "clip-ob")
 			.append("rect")
 			.attr("width", width4)
-			.attr("height", height4);
+			//.attr("height", height4)
+			.attr("height", height4 + 2)	//so lines at very top of domain not cut off
+			.attr("transform", "translate(0,-2)")
+		
 	
+		
 		outbreakDayChart = svg4.append("g")
 			.attr("class", "outbreakDayChart")
 			.attr("transform", "translate(" + margin[id4].left + "," + margin[id4].top + ")")
@@ -1223,11 +1463,36 @@ function createCharts(data) {
 		x4.domain([1, maxDayNum]); //.nice();  //max day num of outbreak for all data
 		//console.log('x4.domain = ', x4.domain())
 
+		// let outbreakDomainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[chartView.outbreakChart.viewAccumType] : undefined));  //max value for all locations
+		// y4.domain([0, d3.max(outbreakDomainArrayMax) ]); 
+
+		//FOR Y-DOMAIN: get max value for all data
+		let outbreakAccumType = accumTypeOptions.find(acc => acc.key === chartView.outbreakChart.viewAccumType).dKey;
+		let outbreakDomainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[outbreakAccumType] : undefined));  //max value for all locations
+		//console.log('outbreakDomainArrayMax: ', outbreakDomainArrayMax)
+		// if (outbreakScaleType == 'log') {
+		// 	y4.domain([1, d3.max(outbreakDomainArrayMax)]); 
+		// } else {
+		// 	y4.domain([0, d3.max(outbreakDomainArrayMax)]); 
+		// }
+		//console.log('y4.domain: ', y4.domain())
+		let domainMax = d3.max(outbreakDomainArrayMax);
+		if (((outbreakDomainArrayMax.length == 0)||(domainMax==0)) && (outbreakScaleType == 'log')) {
+			y4.domain([1, 1]); 
+		} else if ((outbreakScaleType == 'log') && (chartView.outbreakChart.viewAccumType == 'cumulative')) {
+			y4.domain([1, domainMax]); 
+		} else if (outbreakDomainArrayMax.length == 0) {
+			y4.domain([0, 0]);
+		} else {
+			y4.domain([0, d3.max(outbreakDomainArrayMax)]); 
+		}
+		//console.log('y4.domain = ', y4.domain())
+	
 		//console.log('data for y4 domain: ', data);
 		//let domainMaxArr = [];
 		//domainMaxArr = data.map(d => d3.max(d.values, rec => rec.value));  //max value for each location
 		//console.log('domainMaxArr: ', domainMaxArr)
-		y4.domain([0, d3.max(domainMaxArr) ]); //.nice();
+		//y4.domain([0, d3.max(domainMaxArr) ]); //.nice();
 		//console.log('y4.domain = ', y4.domain())
 		
 	
@@ -1251,8 +1516,23 @@ function createCharts(data) {
 		//console.log('y_ob_title: ', y_ob_title)
 		outbreakDayChart.append("text")
 			.attr("class", "y-axis-title")
-			.attr("transform", "rotate(-90) translate(-170, -50)")  //axis rotated and left of chart 
-			//.text("Daily Confirmed Cases");
+			.attr("transform", function() {
+				if ((chartView.outbreakChart.viewStatType === 'confirmed') && (chartView.outbreakChart.viewAccumType === "daily")) {
+					return "rotate(-90) translate(-175, -50)"
+				} else if ((chartView.outbreakChart.viewStatType === 'death') && (chartView.outbreakChart.viewAccumType === "daily")) {
+					return "rotate(-90) translate(-150, -50)" 
+				} else if ((chartView.outbreakChart.viewStatType === 'confirmed') && (chartView.outbreakChart.viewAccumType === "cumulative")) {
+					return "rotate(-90) translate(-190, -50)" 
+				} else if ((chartView.outbreakChart.viewStatType === 'death') && (chartView.outbreakChart.viewAccumType === "cumulative")) {
+					return "rotate(-90) translate(-165, -50)" 
+				// } else if ((chartView.outbreakChart.viewStatType === 'confirmed') && (chartView.outbreakChart.viewAccumType === "percChange")) {
+				// 	return "rotate(-90) translate(-200, -50)" 
+				// } else if ((chartView.outbreakChart.viewStatType === 'death') && (chartView.outbreakChart.viewAccumType === "percChange")) {
+				// 	return "rotate(-90) translate(-160, -50)" 
+				} else {
+					return "";
+				}
+			}) 
 			.text(y_ob_title);
 
 		//add the X gridlines  (vertical)
@@ -1277,12 +1557,21 @@ function createCharts(data) {
 		 	.attr('class', 'outbreakLines')
 			.attr("clip-path", "url(#clip-ob)");
 
+
 		//Define line constructor (i.e. define x,y coordinates)
 		const outbreakLine = d3.line()
 			.curve(d3.curveMonotoneX)
 			.x(function(d) { return x4(d['dayNum']); })  //rename to x4Scale???
-			.y(function(d) { return y4(d['value']); });  //rename to y4Scale???
-
+			//.y(function(d) { return d[outbreakAccumType] <= 0 ? 0 : y4(d[outbreakAccumType]); }); 
+			//.y(function(d) { console.log('outbreakLine: ', d[outbreakAccumType], ' -> ', y4(d[outbreakAccumType])); return d[outbreakAccumType]<=0? 0 : y4(d[outbreakAccumType]); });  //rename to y4Scale???
+			.y(function(d) { 
+				if ((chartView.outbreakChart.viewAccumType == 'cumulative') && (outbreakScaleType == 'log')) {
+					return d[outbreakAccumType] <= 0 ? height4 + 10 : y4(d[outbreakAccumType]); 
+				} else {
+					return y4(d[outbreakAccumType]); 
+				}
+			}); 
+			
 		
 			
 		//console.log('-------------------------------')
@@ -1359,6 +1648,8 @@ function createCharts(data) {
 				// .attr("x", margin[id2].left)
 				.attr("width", width4)
 				.attr("height", height4)
+				// .attr("height", height4 + 10)
+				// .attr("transform", "translate(0,-10)")
 
 
 
@@ -1443,19 +1734,45 @@ function viewOutbreakChartBy(type) {
 
 function viewOutbreakDayAccum(type) {
 	//console.log('CLICKED ON BUTTON: ', type)
-	if (type=='daily' && document.getElementById('outbreak-total-cum-btn').classList.contains('on')) {
+	if (type=='daily' && (!(document.getElementById('outbreak-total-daily-btn').classList.contains('on')))) {
 		//console.log('CHANGE OutbreakChart to: ', type)
 		chartView.outbreakChart.viewAccumType = type;
-		document.getElementById('outbreak-total-daily-btn').classList.toggle('on');
-		document.getElementById('outbreak-total-cum-btn').classList.toggle('on');
+		document.getElementById('outbreak-total-daily-btn').classList.add('on');
+		document.getElementById('outbreak-total-cum-btn').classList.remove('on');
+		//document.getElementById('outbreak-total-percChange-btn').classList.remove('on');
 		updateOutbreakDayChart();
-	} else if (type=='cumulative' && document.getElementById('outbreak-total-daily-btn').classList.contains('on')){ 
+	} else if (type=='cumulative' && (!(document.getElementById('outbreak-total-cum-btn').classList.contains('on')))) { 
 		//console.log('CHANGE OutbreakChart to: ', type)
 		chartView.outbreakChart.viewAccumType = type;
-		document.getElementById('outbreak-total-daily-btn').classList.toggle('on');
-		document.getElementById('outbreak-total-cum-btn').classList.toggle('on');
+		document.getElementById('outbreak-total-daily-btn').classList.remove('on');
+		document.getElementById('outbreak-total-cum-btn').classList.add('on');
+		//document.getElementById('outbreak-total-percChange-btn').classList.remove('on');
 		updateOutbreakDayChart();
+	// } else if (type=='percChange' && (!(document.getElementById('outbreak-total-percChange-btn').classList.contains('on')))) { 
+	// 	console.log('CHANGE OutbreakChart to: ', type)
+	// 	chartView.outbreakChart.viewAccumType = type;
+	// 	document.getElementById('outbreak-total-daily-btn').classList.remove('on');
+	// 	document.getElementById('outbreak-total-cum-btn').classList.remove('on');
+	// 	document.getElementById('outbreak-total-percChange-btn').classList.add('on');
+	// 	updateOutbreakDayChart();
 	} 
+}
+
+function changeOutbreakScale(scaleType) {
+	//console.log('CLICKED ON BUTTON: ', scaleType)
+	if (scaleType=='linear' && (!(document.getElementById('outbreak-scale-linear-btn').classList.contains('on')))) {
+		//console.log('CHANGE OutbreakChart SCALE to: ', scaleType)
+		outbreakScaleType = scaleType;
+		document.getElementById('outbreak-scale-linear-btn').classList.toggle('on');
+		document.getElementById('outbreak-scale-log-btn').classList.toggle('on');
+		updateOutbreakDayChart();
+	} else if (scaleType=='log' && (!(document.getElementById('outbreak-scale-log-btn').classList.contains('on')))) { 
+		//console.log('CHANGE OutbreakChart SCALE to: ', scaleType)
+		outbreakScaleType = scaleType;
+		document.getElementById('outbreak-scale-linear-btn').classList.toggle('on');
+		document.getElementById('outbreak-scale-log-btn').classList.toggle('on');
+		updateOutbreakDayChart();
+	}
 }
 
 function viewTimeSeriesChartBy(type) {
@@ -1492,6 +1809,130 @@ function viewTimeSeriesAccum(type) {
 	} 
 }
 
+function changeTimeSeriesScale(scaleType) {
+	//console.log('CLICKED ON BUTTON: ', scaleType)
+	if (scaleType=='linear' && (!(document.getElementById('timeseries-scale-linear-btn').classList.contains('on')))) {
+		//console.log('CHANGE TimeSeriesChart SCALE to: ', scaleType)
+		timeSeriesScaleType = scaleType;
+		document.getElementById('timeseries-scale-linear-btn').classList.toggle('on');
+		document.getElementById('timeseries-scale-log-btn').classList.toggle('on');
+		updateTimeSeriesChart();
+	} else if (scaleType=='log' && (!(document.getElementById('timeseries-scale-log-btn').classList.contains('on')))) { 
+		//console.log('CHANGE TimeSeriesChart SCALE to: ', scaleType)
+		timeSeriesScaleType = scaleType;
+		document.getElementById('timeseries-scale-linear-btn').classList.toggle('on');
+		document.getElementById('timeseries-scale-log-btn').classList.toggle('on');
+		updateTimeSeriesChart();
+	}
+}
+
+
+
+
+function openLocSearchFilter() {
+	//console.log('in openLocSearchFilter')
+	document.getElementById("locSearchDropdown").classList.add("show");
+}
+
+function filterLocsFunction() {
+	//console.log('in filterLocsFunction')
+	let input, filter, div, a, i;
+	input = document.getElementById("locSearchInput");
+	filter = input.value.toUpperCase();
+	div = document.getElementById("locSearchDropdown");
+	a = div.getElementsByTagName("a");
+	//a = document.getElementsByClassName("locSearchName");
+	//console.log('a: ', a)
+	//console.log('input,filter,div,a:', input, filter, div)
+	let countDisplayed = 0;
+
+	for (i = 0; i < a.length; i++) {
+	  txtValue = a[i].textContent || a[i].innerText;
+	  if (txtValue.toUpperCase().indexOf(filter) > -1) {
+		a[i].style.display = "";
+		countDisplayed++;
+	  } else {
+		a[i].style.display = "none";
+	  }
+	}
+	//console.log('a.length, countDisplayed: ', a.length, countDisplayed)
+	if (countDisplayed==0) {
+		document.getElementById("noLocSearch").style.display = "";
+	} else {
+		document.getElementById("noLocSearch").style.display = "none";
+	}
+	
+
+}
+
+
+function closeLocSearchDropdown() {
+	//remove search text so on next opening dropdown is fully populated
+	document.getElementById("locSearchInput").value = '';
+	let div = document.getElementById("locSearchDropdown");
+	let a = div.getElementsByTagName("a");
+	for (i = 0; i < a.length; i++) {
+		a[i].style.display = "";
+	}
+	document.getElementById("noLocSearch").style.display = "none";
+
+	//remove dropdown
+	document.getElementById("locSearchDropdown").classList.remove("show");
+}
+
+
+
+function blurLocSearchDropdown() {
+	setTimeout(function(){ 
+		closeLocSearchDropdown();
+	}, 200);
+}
+
+
+
+function searchClick(locCode) {
+	//console.log('searchClick ', locCode)
+
+	closeLocSearchDropdown();
+
+	//assuming bar is in top 10:
+	let bar = document.getElementById("bar_a_" + locCode);
+	let bar_overlay = document.getElementById("bar_overlay_a_" + locCode);
+	//console.log('bar: ', locCode, bar)
+
+	//if not in top 10:
+	if (bar == null) {
+		bar = document.getElementById("bar_b_" + locCode);
+		bar_overlay = document.getElementById("bar_overlay_b_" + locCode);
+	
+		let position = bar.y.baseVal.value;
+		//console.log('y-position: ', position)
+
+		let chart = document.getElementById("loc-type-chart-b");
+		//console.log('chart: ', chart)
+		chart.scroll({
+			top: position,
+			left: 0,
+			behavior: 'smooth'
+		});	
+	}
+
+	bar.dispatchEvent(new Event('click'));
+	//console.log('bar before event: ', bar)
+	
+	bar.dispatchEvent(new Event('mouseover'));
+	//bar_overlay.dispatchEvent(new Event('mouseover'));
+
+	setTimeout(function(){ 
+		bar.dispatchEvent(new Event('mouseout'));
+		//bar_overlay.dispatchEvent(new Event('mouseout'));
+		//console.log('bar after done: ', bar)
+	}, 3000);
+
+}
+
+
+
 
 
 function updateCharts() {
@@ -1522,9 +1963,9 @@ function updateLocationTotalsRowChart(type) {
 		locTotal = statTotalPerLoc.find(t => (t.key === d['locCode']));
 		//console.log('locTotal: ', locTotal)
 		locValues.forEach(v => {
-			locTotal['value'] += (v['type'] === chartView.locRowChart.viewStatType) ? v['value'] : 0;
-		
+			locTotal['value'] += (v['type'] === chartView.locRowChart.viewStatType) ? v['value'] : 0;	
 		})
+		if (locTotal['value'] < 0) locTotal['value'] = 0; 
 	});
 	// console.log('*** statTotalPerLoc: ', statTotalPerLoc.sort(function(a, b) {
 	// 	return b.value - a.value;
@@ -1545,6 +1986,7 @@ function updateLocationTotalsRowChart(type) {
 	
 	
 	//Resize main SVGs
+	//console.log('resize locationChart width ', width1a)
 	svg1a.attr("width", width1a + margin[id1a].left + margin[id1a].right)
 		  .attr("height", height1a + margin[id1a].top + margin[id1a].bottom);
 	svg1b.attr("width", width1b + margin[id1b].left + margin[id1b].right)
@@ -1590,10 +2032,10 @@ function updateLocationTotalsRowChart(type) {
 	x1a.domain([0, d3.max(statTotalPerLoc_a, function(d) {
 		return d.value;			// max is max for total values for any location (not max for a single day)
 	})]);
-	//console.log('x.domain = ', x.domain())
+	//console.log('x1a.domain = ', x1a.domain())
 	
 	y1a.domain(statTotalPerLoc_a.map(d => d.key)); 
-	//console.log('y.domain = ', y.domain())
+	//console.log('y1a.domain = ', y1a.domain())
 
 
 	x1b.domain([0, d3.max(statTotalPerLoc_b, function(d) {
@@ -1610,7 +2052,7 @@ function updateLocationTotalsRowChart(type) {
 	let bar_height_b = (height1b / statTotalPerLoc_b.length) - getBarSpacing(height1b / statTotalPerLoc_b.length); //setting bar height
 
 	
-	//xyz
+	
 	locRowChart_a.select(".axis--x1a") //transition the x axis
 		.transition()
 	 	.duration(750)
@@ -1828,7 +2270,7 @@ function updateLocationTotalsRowChart(type) {
 
 
 function updateTimeSeriesChart() {
-	//console.log('updateTimeSeriesChart ')
+	//console.log('--------- updateTimeSeriesChart -----------')
 	//console.log('in updateTimeSeriesChart, data: ', allData)
 	let data = allData;
 
@@ -1839,54 +2281,109 @@ function updateTimeSeriesChart() {
 
 	svg2.select("defs").select("#clip-ts").select("rect")
 		.attr("width", width2)
-		.attr("height", height2);
+		//.attr("height", height2)
+		.attr("height", height2 + 2)		//so lines at very top of domain not cut off
+		.attr("transform", "translate(0,-2)");
 
-	let x2 = d3.scaleTime().range([0, width2]), //x-axis width, accounting for specified margins
-		y2 = d3.scaleLinear().range([height2, 0]);
-		x2.domain([minDate,maxDate]);
-		//console.log('x2.domain = ', x2.domain())
+	let x2 = d3.scaleTime().range([0, width2]); //x-axis width, accounting for specified margins
+	//let y2 = d3.scaleLinear().range([height2, 0]);
+	let y2 = function() {
+		if (chartView.timeSeriesChart.viewAccumType == 'daily') {
+			return d3.scaleLinear().range([height2, 0]);;
+		} else {
+			switch(timeSeriesScaleType) {
+					case 'linear': return d3.scaleLinear().range([height2, 0]);
+					case 'log': return d3.scaleLog().range([height2, 0]);
+					case 'default': return d3.scaleLinear().range([height2, 0]);
+			};
+		}		
+	}();
+
+
+	x2.domain([minDate,maxDate]);
+	//console.log('x2.domain = ', x2.domain())
 
 
 		
 	
-	let selectedData = data.filter(d => selectedLocList.indexOf(d.locCode)!=-1);  //selectedData: ONLY OUTBREAK DATA POINTS, ONLY SELECTED LOCATIONS
+	let selectedData = data.filter(d => selectedLocList.indexOf(d.locCode)!=-1);  //selectedData: ONLY SELECTED LOCATIONS
 	//console.log('selectedData: ', selectedData)
 
-	let currentAccumType = chartView.timeSeriesChart.viewAccumType == 'daily' ? 'value' : 'cumVal';
+	let timeSeriesAccumType = accumTypeOptions.find(acc => acc.key == chartView.timeSeriesChart.viewAccumType).dKey;
+	//console.log('timeSeriesAccumType: ', timeSeriesAccumType)
+
+	//show or hide log/linear buttons
+	if (chartView.timeSeriesChart.viewAccumType == 'cumulative') {
+		document.getElementById('timeSeries-scale-btns').style.display = 'inline-block';
+	} else {
+		document.getElementById('timeSeries-scale-btns').style.display = 'none';
+	}
 
 
 	//FOR Y-DOMAIN: get max value for selectedOutbreakData (or if empty then for outbreakData)
-	let domainArray, domainArrayMax;
-	// if (selectedOutbreakData.length == 0) {
-	// 	domainArray = outbreakData.filter(d => selectedLocList.indexOf(d.locCode) != -1)
-	// } else {
-	// 	domainArray = selectedOutbreakData.filter(d => selectedLocList.indexOf(d.locCode) != -1)
-	// }
-	domainArray = selectedData;
-	//console.log('domainArray: ', domainArray.length, domainArray)
+	let timeSeriesDomainArray, timeSeriesDomainArrayMax;
+	timeSeriesDomainArray = selectedData;
+	//console.log('timeSeriesDomainArray: ', timeSeriesDomainArray.length, timeSeriesDomainArray)
 
-	if (domainArray.length==0) {		
-		domainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.timeSeriesChart.viewStatType) ? rec[currentAccumType] : undefined));  //max value for all locations
+	if (timeSeriesDomainArray.length==0) {		
+		timeSeriesDomainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.timeSeriesChart.viewStatType) ? rec[timeSeriesAccumType] : undefined));  //max value for all locations
 	} else {
-		domainArrayMax = domainArray.map(d => d3.max(d.values, rec => (rec.type === chartView.timeSeriesChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined);  //max value for each selected location
+		timeSeriesDomainArrayMax = timeSeriesDomainArray.map(d => d3.max(d.values, rec => (rec.type === chartView.timeSeriesChart.viewStatType) ? rec[timeSeriesAccumType] : undefined)).filter(v => v != undefined);  //max value for each selected location
 	}
-	//console.log('domainArrayMax: ', domainArrayMax.length, domainArrayMax)
+	//console.log('timeSeriesDomainArrayMax: ', timeSeriesDomainArrayMax.length, timeSeriesDomainArrayMax)
 
-	if (domainArrayMax.length == 0) {
-		y2.domain([0,1])
-	} else {
-		y2.domain([0, d3.max(domainArrayMax) ]); 
-	}	
+
+	// if (domainArrayMax.length == 0) {
+	// 	y2.domain([0,1])
+	// } else {
+	// 	y2.domain([0, d3.max(domainArrayMax) ]); 
+	// }	
 	// console.log('--- y2.domain = ', y2.domain())
+	
+	let domainMax = d3.max(timeSeriesDomainArrayMax);
+	//cumulative log, value <= 5 or no values for selection:
+	if (((timeSeriesDomainArrayMax.length == 0)||(domainMax <= 5)) && (chartView.timeSeriesChart.viewAccumType == 'cumulative') && (timeSeriesScaleType == 'log')) {
+		y2.domain([1, 5]); 
+	//cumulative log, value > 0:
+	} else if ((timeSeriesScaleType == 'log') && (chartView.timeSeriesChart.viewAccumType == 'cumulative')) {
+		y2.domain([1, domainMax]); 
+	//value <= 5 or no values for selection - keep a min of 5 for y-axis:
+	} else if ((timeSeriesDomainArrayMax.length == 0) || (domainMax <= 5)) {
+		y2.domain([0, 5]);
+	} else {
+		y2.domain([0, domainMax]); 
+	}
+	//console.log('y2.domain = ', y2.domain())
 
 
-	function numYTicks(maxY) {
-		switch (maxY) {
-			case 1: return 1;
-			case 2: return 2;
-			case 3: return 3;
-			case 4: return 4;
-			default: return 5;
+	// function numYTicks(maxY) {
+	// 	switch (maxY) {
+	// 		case 1: return 1;
+	// 		case 2: return 2;
+	// 		case 3: return 3;
+	// 		case 4: return 4;
+	// 		default: return 5;
+	// 	}			
+	// }
+	
+	function numYTicks(maxY) {  //ticks on y-axis
+		//console.log('numYTicks: ', maxY)
+		if (chartView.timeSeriesChart.viewAccumType == 'cumulative' && timeSeriesScaleType == 'log') {
+			switch (true) {
+				case (maxY <= 100): return 2;
+				case (maxY <= 1000): return 2;
+				case (maxY <= 10000): return 3;
+				case (maxY <= 100000): return 4;
+				default: return 4;
+			}		
+		} else {
+			switch (maxY) {
+				case 1: return 1;
+				case 2: return 2;
+				case 3: return 3;
+				case 4: return 4;
+				default: return 4;
+			}
 		}			
 	}
 
@@ -1918,13 +2415,13 @@ function updateTimeSeriesChart() {
 	timeSeriesChart.select(".y-axis-title")  //position title depending on text
 		.attr("transform", function() {
 			if ((chartView.timeSeriesChart.viewStatType === 'confirmed') && (chartView.timeSeriesChart.viewAccumType === "daily")) {
-				return "rotate(-90) translate(-102, -50)"
+				return "rotate(-90) translate(-92, -50)"
 			} else if ((chartView.timeSeriesChart.viewStatType === 'death') && (chartView.timeSeriesChart.viewAccumType === "daily")) {
-				return "rotate(-90) translate(-80, -50)" 
+				return "rotate(-90) translate(-70, -50)" 
 			} else if ((chartView.timeSeriesChart.viewStatType === 'confirmed') && (chartView.timeSeriesChart.viewAccumType === "cumulative")) {
-				return "rotate(-90) translate(-124, -50)" 
+				return "rotate(-90) translate(-110, -50)" 
 			} else if ((chartView.timeSeriesChart.viewStatType === 'death') && (chartView.timeSeriesChart.viewAccumType === "cumulative")) {
-				return "rotate(-90) translate(-90, -50)" 
+				return "rotate(-90) translate(-86, -50)" 
 			} else {
 				return "" 
 			}
@@ -1936,14 +2433,22 @@ function updateTimeSeriesChart() {
 	const locationLine = d3.line()
 		.curve(d3.curveMonotoneX)
 		.x(function(d) { return x2(d['date']); })  //rename to x2Scale???
-		.y(function(d) { return y2(d[currentAccumType]); });  //rename to y2Scale???
-		
+		//.y(function(d) { return y2(d[timeSeriesAccumType]); });  //rename to y2Scale???	
+		.y(function(d) { 
+			//console.log(d[timeSeriesAccumType], y2(d[timeSeriesAccumType])); 
+			if ((chartView.timeSeriesChart.viewAccumType == 'cumulative')&& (timeSeriesScaleType == 'log')) {
+				//console.log('y: ', d[currentAccumType], ' -> ', d[currentAccumType] <= 0 ? height4 : y4(d[currentAccumType]));
+				return d[timeSeriesAccumType] <= 0 ? height2 + 10 : y2(d[timeSeriesAccumType]); 
+			} else {
+				return y2(d[timeSeriesAccumType]); 
+			}
+		});  //rename to y2Scale???
+
+	//console.log('*** timeSeriesAccumType: ', timeSeriesAccumType, chartView.timeSeriesChart.viewAccumType)
 
 
    
-	// //HEIDI - READ http://datawanderings.com/2019/10/28/tutorial-making-a-line-chart-in-d3-js-v-5/
 	// // Draw lines
-
 	//let lines = timeSeriesChart.select('.locLines').selectAll('path.line-AFG_1')   //selection for specific line
 	//let lines = timeSeriesChart.select('.locLines').selectAll('path')   //selection good for all lines
 	//let lines = timeSeriesChart.select('.locLines').selectAll('.line')  //selection good for all lines
@@ -2069,7 +2574,7 @@ function updateTimeSeriesChart() {
 
 function updateOutbreakDayChart() {
 	//console.log('--------------------------------------')
-	// console.log('------ updateOutbreakDayChart ----------')
+    //console.log('------ updateOutbreakDayChart ----------')
 	//console.log('in updateOutbreakDayChart, data: ', allData)
 	let data = allData;				//data: ALL DATA POINTS FOR ALL LOCATIONS
 	//console.log('data: ', data)   
@@ -2087,7 +2592,16 @@ function updateOutbreakDayChart() {
 	let selectedOutbreakData = outbreakData.filter(d => selectedLocList.indexOf(d.locCode)!=-1);  //selectedOutbreakData: ONLY OUTBREAK DATA POINTS, ONLY SELECTED LOCATIONS
 	// console.log('selectedOutbreakData: ', selectedOutbreakData)
 
-	let currentAccumType = chartView.outbreakChart.viewAccumType == 'daily' ? 'value' : 'cumVal';
+	//let currentAccumType = chartView.outbreakChart.viewAccumType == 'daily' ? 'value' : 'cumVal';
+	let currentAccumType = accumTypeOptions.find(acc => acc.key == chartView.outbreakChart.viewAccumType).dKey;
+	//console.log('currentAccumType: ', currentAccumType)
+
+	
+	if (chartView.outbreakChart.viewAccumType == 'cumulative') {
+		document.getElementById('outbreak-scale-btns').style.display = 'inline-block';
+	} else {
+		document.getElementById('outbreak-scale-btns').style.display = 'none';
+	}
 
 
 	// ************* UPDATE OUTBREAK DAY CHART ***************** //
@@ -2098,43 +2612,80 @@ function updateOutbreakDayChart() {
 
 	svg4.select("defs").select("#clip-ob").select("rect")
 		.attr("width", width4)
-		.attr("height", height4);
+		//.attr("height", height4)
+		.attr("height", height4 + 2)		//so lines at very top of domain not cut off
+		.attr("transform", "translate(0,-2)")
 		  
-	let x4 = d3.scaleLinear().range([0, width4]), //x-axis width, accounting for specified margins
-		y4 = d3.scaleLinear().range([height4, 0]);
-		
+	let x4 = d3.scaleLinear().range([0, width4]); //x-axis width, accounting for specified margins
+	let y4 = function() {
+		if (chartView.outbreakChart.viewAccumType == 'daily') {
+			return d3.scaleLinear().range([height4, 0]);;
+		} else {
+			switch(outbreakScaleType) {
+					case 'linear': return d3.scaleLinear().range([height4, 0]);
+					case 'log': return d3.scaleLog().range([height4, 0]);
+					case 'default': return d3.scaleLinear().range([height4, 0]);
+			};
+		}		
+	}();
+	//y4 = d3.scaleLinear().range([height4, 0])
+	//y4 = d3.scaleLog().range([height4, 0])
 
 	//FOR Y-DOMAIN: get max value for selectedOutbreakData (or if empty then for outbreakData)
-	let domainArray, domainArrayMax;
+	//First get all data for selected location outbreaks; if none selected then get all data for all locations for outbreaks
+	let outbreakDomainArray, outbreakDomainArrayMax;
+	//let outbreakDomainArrayMin;
+	//let outbreakDomainMin = 0;
 	if (selectedOutbreakData.length == 0) {
-		domainArray = outbreakData.filter(d => selectedLocList.indexOf(d.locCode) != -1)
+		outbreakDomainArray = outbreakData.filter(d => selectedLocList.indexOf(d.locCode) != -1)
 	} else {
-		domainArray = selectedOutbreakData.filter(d => selectedLocList.indexOf(d.locCode) != -1)
+		outbreakDomainArray = selectedOutbreakData.filter(d => selectedLocList.indexOf(d.locCode) != -1)
 	}
-	//console.log('domainArray: ', domainArray.length, domainArray)
+	//console.log('outbreakDomainArray: ', outbreakDomainArray.length, outbreakDomainArray)
 
-	if (domainArray.length==0) {		
-		domainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined));  //max value/cumVal for all locations
+	//Create array of max values for each location
+	if (outbreakDomainArray.length==0) {		
+		outbreakDomainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));  //max value/cumVal/percChange for all locations
 	} else {
-		domainArrayMax = domainArray.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined);  //max value/cumVal for each selected location
+		outbreakDomainArrayMax = outbreakDomainArray.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));  //max value/cumVal/percChange for each selected location
 	}
-	//console.log('domainArrayMax: ', domainArrayMax.length, domainArrayMax)
+	//console.log('outbreakDomainArrayMax: ', outbreakDomainArrayMax.length, outbreakDomainArrayMax)
 
-	if (domainArrayMax.length == 0) {
-		y4.domain([0,1])
+	// if (currentAccumType == 'percChange') {
+	// 	if (outbreakDomainArray.length==0) {		
+	// 		outbreakDomainArrayMin = data.map(d => d3.min(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));  //min percChange for all locations
+	// 	} else {
+	// 		outbreakDomainArrayMin = outbreakDomainArray.map(d => d3.min(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));  //min percChange for each selected location
+	// 	}
+	// 	//console.log('outbreakDomainArrayMin: ', outbreakDomainArrayMin)
+	// 	outbreakDomainMin = d3.min(outbreakDomainArrayMin)
+	// }
+	// if (outbreakDomainArrayMax.length == 0) {
+	// 	y4.domain([outbreakDomainMin,1])
+	// } else {
+	// 	y4.domain([outbreakDomainMin, d3.max(outbreakDomainArrayMax) ]); 
+	// }	
+
+	let domainMax = d3.max(outbreakDomainArrayMax);
+	if (((outbreakDomainArrayMax.length == 0)||(domainMax==0)) && (outbreakScaleType == 'log')) {
+		y4.domain([1, 1]); 
+	} else if ((outbreakScaleType == 'log') && (chartView.outbreakChart.viewAccumType == 'cumulative'))  {
+		y4.domain([1, domainMax]); 
+	} else if (outbreakDomainArrayMax.length == 0) {
+		y4.domain([0, 0]);
 	} else {
-		y4.domain([0, d3.max(domainArrayMax) ]); 
-	}	
+		y4.domain([0, d3.max(outbreakDomainArrayMax)]); 
+	}
 	//console.log('y4.domain = ', y4.domain())
 
 
 	//FOR X-DOMAIN:
 	let maxDayNum = 1;
 	let allDayNumsArr = [];
-	if (domainArray.length==0) {
+	if (outbreakDomainArray.length==0) {
 		allDayNumsArr = data.map(d => d3.max(d.values, rec => rec.dayNum)).filter(v => v != undefined); 
 	} else {
-		allDayNumsArr = domainArray.map(d => d3.max(d.values, rec => rec.dayNum)).filter(v => v != undefined);
+		allDayNumsArr = outbreakDomainArray.map(d => d3.max(d.values, rec => rec.dayNum)).filter(v => v != undefined);
 	}
 	if (allDayNumsArr.length > 0) {
 		maxDayNum = d3.max(allDayNumsArr)
@@ -2144,7 +2695,7 @@ function updateOutbreakDayChart() {
 	x4.domain([1, maxDayNum]); //.nice();  //max day num of outbreak for selected locations
 	//console.log('x4.domain = ', x4.domain())
 
-	function numXTicks(maxX) {
+	function numXTicks(maxX) {  //ticks on x-axis
 		switch (maxX) {
 			case 1: return 1;
 			case 2: return 1;
@@ -2153,39 +2704,57 @@ function updateOutbreakDayChart() {
 			default: return 5;
 		}			
 	}
-	function numYTicks(maxY) {
-		switch (maxY) {
-			case 1: return 1;
-			case 2: return 2;
-			case 3: return 3;
-			case 4: return 4;
-			default: return 5;
+	function numYTicks(maxY) {  //ticks on y-axis
+		//console.log('numYTicks: ', maxY)
+		if (chartView.outbreakChart.viewAccumType == 'cumulative' && outbreakScaleType == 'log') {
+			switch (true) {
+				case (maxY <= 100): return 2;
+				case (maxY <= 1000): return 2;
+				case (maxY <= 10000): return 3;
+				case (maxY <= 100000): return 4;
+				default: return 4;
+			}		
+		} else {
+			switch (maxY) {
+				case 1: return 1;
+				case 2: return 2;
+				case 3: return 3;
+				case 4: return 4;
+				default: return 4;
+			}
 		}			
 	}
+
+
 	let x4Axis = d3.axisBottom(x4).ticks(numXTicks(maxDayNum)).tickFormat(function(d) {
+			//console.log('x4Axis: ', formatNumber(d.toFixed(0)))
 			return formatNumber(d.toFixed(0))
 		}),
 		y4Axis = d3.axisLeft(y4).ticks(numYTicks(y4.domain()[1])).tickFormat(function(d) {
+			//console.log('y4Axis: ', formatNumber(d.toFixed(0)))
 			return formatNumber(d.toFixed(0))
 		});
 
-	// gridlines in x axis function
+	// gridlines in x axis function - vertical
 	function make_x_gridlines() {		
 		return d3.axisBottom(x4)
-			.ticks(5)
+			//.ticks(5)
+			.ticks(numXTicks(maxDayNum))
 	}
 
-	// gridlines in y axis function
+	// gridlines in y axis function - horizontal
 	function make_y_gridlines() {		
 		return d3.axisLeft(y4)
-			.ticks(5)
+			//.ticks(5)
+			.ticks(numYTicks(y4.domain()[1]))
 	}
 
 
 	outbreakDayChart = svg4.select('.outbreakDayChart')
 	outbreakDayChart.select(".axis--x4") // change the x axis
 		.transition()
-	 	.duration(750)
+		.duration(750)
+		//.attr('transform', 'translate(0,' + (y4(0)) + ')')
 		.call(x4Axis);
 
 	outbreakDayChart.select(".axis--y4") // change the y axis
@@ -2196,12 +2765,14 @@ function updateOutbreakDayChart() {
 	outbreakDayChart.select(".o_overlay")
 		.attr("width", width4)
 		.attr("height", height4)
+		// .attr("height", height4 + 10)
+		// .attr("transform", "translate(0,-10)")
 
 	//transition X gridlines  (vertical)
 	outbreakDayChart.select(".grid-x")			
 		.transition()
 	 	.duration(750)
-		//.attr("transform", "translate(0," + height4 + ")")
+		.attr("transform", "translate(0," + height4 + ")")
 		.call(make_x_gridlines()
 			.tickSize(-height4)
 			.tickFormat("")
@@ -2220,13 +2791,17 @@ function updateOutbreakDayChart() {
 	outbreakDayChart.select(".y-axis-title")
 		.attr("transform", function() {
 			if ((chartView.outbreakChart.viewStatType === 'confirmed') && (chartView.outbreakChart.viewAccumType === "daily")) {
-				return "rotate(-90) translate(-170, -50)"
+				return "rotate(-90) translate(-175, -50)"
 			} else if ((chartView.outbreakChart.viewStatType === 'death') && (chartView.outbreakChart.viewAccumType === "daily")) {
 				return "rotate(-90) translate(-150, -50)" 
 			} else if ((chartView.outbreakChart.viewStatType === 'confirmed') && (chartView.outbreakChart.viewAccumType === "cumulative")) {
-				return "rotate(-90) translate(-180, -50)" 
+				return "rotate(-90) translate(-190, -50)" 
 			} else if ((chartView.outbreakChart.viewStatType === 'death') && (chartView.outbreakChart.viewAccumType === "cumulative")) {
-				return "rotate(-90) translate(-160, -50)" 
+				return "rotate(-90) translate(-165, -50)" 
+			// } else if ((chartView.outbreakChart.viewStatType === 'confirmed') && (chartView.outbreakChart.viewAccumType === "percChange")) {
+			// 	return "rotate(-90) translate(-200, -50)" 
+			// } else if ((chartView.outbreakChart.viewStatType === 'death') && (chartView.outbreakChart.viewAccumType === "percChange")) {
+			// 	return "rotate(-90) translate(-160, -50)" 
 			} else {
 				return "";
 			}
@@ -2241,10 +2816,15 @@ function updateOutbreakDayChart() {
 			return x4(d['dayNum']); 
 		})  //rename to x4Scale???
 		.y(function(d) { 
-			//console.log(d['value'], y4(d['value])); 
-			return y4(d[currentAccumType]); 
+			if ((chartView.outbreakChart.viewAccumType == 'cumulative') && (chartView.outbreakChart.viewStatType == 'death') && (outbreakScaleType == 'log')) {
+				//console.log('y: ', d[currentAccumType], ' -> ', d[currentAccumType] <= 0 ? height4 : y4(d[currentAccumType]));
+				return d[currentAccumType] <= 0 ? height4 + 10 : y4(d[currentAccumType]); 
+			} else {
+				return y4(d[currentAccumType]); 
+			}
 		});  //rename to y4Scale???
 
+	//console.log('*** currentAccumType: ', currentAccumType, chartView.outbreakChart.viewAccumType)
 
 	//Draw lines
 	let o_pos;
@@ -2257,6 +2837,14 @@ function updateOutbreakDayChart() {
 		.attr("d", function(d) {   //with filter
 			return outbreakLine(d.values.filter(rec => rec['type'] === chartView.outbreakChart.viewStatType)); //outbreakLine should receive array of object datapoints for a location e.g. [{date: xxx, value: yyy}, {date: xxx, value: yyy}, ...]
 		})
+		// .attr("d", function(d) {
+			
+		// 	if ((chartView.outbreakChart.viewAccumType == 'cumulative') && (chartView.outbreakChart.viewStatType == 'death')) {
+		// 		return outbreakLine(d.values.filter(rec => rec['type'] === chartView.outbreakChart.viewStatType && rec['value'] != 0));
+		// 	} else {
+		// 		return outbreakLine(d.values.filter(rec => rec['type'] === chartView.outbreakChart.viewStatType));
+		// 	}
+		// })
 	    .attr("stroke", function(d) {
 			//pos = selectedLocList.indexOf(d.locCode);
 			// if (d.locCode == tempHoverLoc) d3.select(this).raise();
@@ -2466,15 +3054,17 @@ function getLocNameFromCode(code) {
 			case 'France (French Polynesia)': return 'France (Fr. Polynesia)';
 			case 'France (New Caledonia)': return 'France (N. Caledonia)';
 			case 'France (Saint Barthelemy)': return 'France (St Barthelemy)';
+			case 'France (Saint Pierre and Miquelon)': return 'France (St Pierre & Miq)';
 			case 'Netherlands (Bonaire, Sint Eustatius and Saba)': return 'Netherlands (BQ)';
 			case 'Netherlands (Sint Maarten)': return 'Netherlands (St Maarten)';
 			case 'Saint Vincent and the Grenadines': return 'St Vincent & Grenadines';
-			//case 'United Kingdom': return 'UK';
+			case 'United Kingdom': return 'UK';
 			case 'United Kingdom (Bermuda)': return 'UK (Bermuda)';
 			case 'United Kingdom (Cayman Islands)': return 'UK (Cayman Isl.)';
 			case 'United Kingdom (Channel Islands)': return 'UK (Channel Isl.)';
 			case 'United Kingdom (Gibraltar)': return 'UK (Gibraltar)';
 			case 'United Kingdom (Falkland Islands (Islas Malvinas))': return 'UK (Falkland Islands)';
+			case 'United Kingdom (Falkland Islands (Malvinas))': return 'UK (Falkland Islands)';
 			case 'United Kingdom (Isle of Man)': return 'UK (Isle of Man)';
 			case 'United Kingdom (Montserrat)': return 'UK (Montserrat)';
 			case 'United Kingdom (Turks and Caicos Islands)': return 'UK (Turks & Caicos Isl.)';
@@ -2515,17 +3105,29 @@ function tooltip(selectedData) {
 	//console.log('width2, height2: ', width2, height2)
 	//console.log('tooltip selectedData: ', selectedData)
 	let data = allData;
-	let x2 = d3.scaleTime().range([0, width2]), //x-axis width, accounting for specified margins
-		y2 = d3.scaleLinear().range([height2, 0])
-		x2.domain([minDate,maxDate]);
+	let x2 = d3.scaleTime().range([0, width2]); //x-axis width, accounting for specified margins
+	//let y2 = d3.scaleLinear().range([height2, 0])
+	let y2 = function() {
+		if (chartView.timeSeriesChart.viewAccumType == 'daily') {
+			return d3.scaleLinear().range([height2, 0]);;
+		} else {
+			switch(timeSeriesScaleType) {
+					case 'linear': return d3.scaleLinear().range([height2, 0]);
+					case 'log': return d3.scaleLog().range([height2, 0]);
+					case 'default': return d3.scaleLinear().range([height2, 0]);
+			};
+		}		
+	}();
+	x2.domain([minDate,maxDate]);
 
-	let currentAccumType = chartView.timeSeriesChart.viewAccumType == 'daily' ? 'value' : 'cumVal';
+	let timeSeriesAccumType = accumTypeOptions.find(acc => acc.key == chartView.timeSeriesChart.viewAccumType).dKey;
+	//console.log('timeSeriesAccumType: ', timeSeriesAccumType)
 
 	//let selectedData = data.filter(d => selectedLocList.indexOf(d.locCode)!=-1);
 	//console.log('NEW selectedData: ', selectedData)
 	//FOR Y-DOMAIN: get max value for selectedData (or if empty then for data)
 	//let domainArray;
-	let domainArrayMax;
+	let timeSeriesDomainArrayMax;
 	// if (selectedData.length == 0) {
 	// 	domainArray = data.filter(d => selectedLocList.indexOf(d.locCode) != -1)
 	// } else {
@@ -2534,19 +3136,34 @@ function tooltip(selectedData) {
 	//console.log('domainArray: ', domainArray.length, domainArray)
 
 	if (selectedData.length==0) {		
-		domainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.timeSeriesChart.viewStatType) ? rec[currentAccumType] : undefined));  //max value for all locations
+		timeSeriesDomainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.timeSeriesChart.viewStatType) ? rec[timeSeriesAccumType] : undefined));  //max value for all locations
 	} else {
-		domainArrayMax = selectedData.map(d => d3.max(d.values, rec => (rec.type === chartView.timeSeriesChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined);  //max value for each selected location
+		timeSeriesDomainArrayMax = selectedData.map(d => d3.max(d.values, rec => (rec.type === chartView.timeSeriesChart.viewStatType) ? rec[timeSeriesAccumType] : undefined)).filter(v => v != undefined);  //max value for each selected location
 	}
-	//console.log('domainArrayMax: ', domainArrayMax.length, domainArrayMax)
-	//console.log('MAX 2: ', d3.max(domainArrayMax) )
-	if (domainArrayMax.length == 0) {
-		y2.domain([0,1])
-	} else {
-		y2.domain([0, d3.max(domainArrayMax) ]); 
-	}	
+	//console.log('timeSeriesDomainArrayMax: ', timeSeriesDomainArrayMax.length, timeSeriesDomainArrayMax)
+
+
+	// if (timeSeriesDomainArrayMax.length == 0) {
+	// 	y2.domain([0,1])
+	// } else {
+	// 	y2.domain([0, d3.max(timeSeriesDomainArrayMax) ]); 
+	// }	
 	//console.log('y2.domain = ', y2.domain())
   
+	let domainMax = d3.max(timeSeriesDomainArrayMax);
+	//cumulative log, value <= 5 or no values for selection:
+	if (((timeSeriesDomainArrayMax.length == 0)||(domainMax <= 5)) && (chartView.timeSeriesChart.viewAccumType == 'cumulative') && (timeSeriesScaleType == 'log')) {
+		y2.domain([1, 5]); 
+	//cumulative log, value > 0:
+	} else if ((timeSeriesScaleType == 'log') && (chartView.timeSeriesChart.viewAccumType == 'cumulative')) {
+		y2.domain([1, domainMax]); 
+	//value <= 5 or no values for selection - keep a min of 5 for y-axis:
+	} else if ((timeSeriesDomainArrayMax.length == 0) || (domainMax <= 5)) {
+		y2.domain([0, 5]);
+	} else {
+		y2.domain([0, domainMax]); 
+	}
+	//console.log('y2.domain = ', y2.domain())
 
 
 	var labels = timeSeriesChart.select('.focus').selectAll(".lineHoverText")
@@ -2598,16 +3215,28 @@ function tooltip(selectedData) {
 			return d.date; 
 		}).left;
 
-		var x2 = d3.scaleTime().range([0, width2]); //x-axis width, accounting for specified margins
-		y2 = d3.scaleLinear().range([height2, 0])
+		let x2 = d3.scaleTime().range([0, width2]); //x-axis width, accounting for specified margins
+		//let y2 = d3.scaleLinear().range([height2, 0]);
+		let y2 = function() {
+			if (chartView.timeSeriesChart.viewAccumType == 'daily') {
+				return d3.scaleLinear().range([height2, 0]);;
+			} else {
+				switch(timeSeriesScaleType) {
+						case 'linear': return d3.scaleLinear().range([height2, 0]);
+						case 'log': return d3.scaleLog().range([height2, 0]);
+						case 'default': return d3.scaleLinear().range([height2, 0]);
+				};
+			}		
+		}();
 		x2.domain([minDate,maxDate]);
 		let x0 = x2.invert(d3.mouse(this)[0]);  //date hovered
 		//console.log('date hovered: ', x0)
 
 		let selectedData = data.filter(d => selectedLocList.indexOf(d.locCode)!=-1);
-
+		//console.log('selectedData: ', selectedData)
 		if (selectedData.length > 0) {
-			let firstLoc = selectedData[0].values.filter(v => v.type === chartView.timeSeriesChart.viewStatType);
+			//let firstLoc = selectedData[0].values.filter(v => v.type === chartView.timeSeriesChart.viewStatType);
+			let firstLoc = selectedData[0].values;
 			//console.log('firstLoc: ', firstLoc)
 			const i = bisectDate(firstLoc, x0, 1);
 			//console.log('i: ', i)
@@ -2638,7 +3267,7 @@ function tooltip(selectedData) {
 		//console.log('NEW selectedData: ', selectedData)
 		//FOR Y-DOMAIN: get max value for selectedData (or if empty then for data)
 		//let domainArray;
-		let domainArrayMax;
+		let timeSeriesDomainArrayMax;
 		// if (selectedData.length == 0) {
 		// 	domainArray = data.filter(d => selectedLocList.indexOf(d.locCode) != -1)
 		// } else {
@@ -2647,17 +3276,32 @@ function tooltip(selectedData) {
 		//console.log('domainArray: ', domainArray.length, domainArray)
 
 		if (selectedData.length==0) {		
-			domainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.timeSeriesChart.viewStatType) ? rec[currentAccumType] : undefined));  //max value for all locations
+			timeSeriesDomainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.timeSeriesChart.viewStatType) ? rec[timeSeriesAccumType] : undefined));  //max value for all locations
 		} else {
-			domainArrayMax = selectedData.map(d => d3.max(d.values, rec => (rec.type === chartView.timeSeriesChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined);  //max value for each selected location
+			timeSeriesDomainArrayMax = selectedData.map(d => d3.max(d.values, rec => (rec.type === chartView.timeSeriesChart.viewStatType) ? rec[timeSeriesAccumType] : undefined)).filter(v => v != undefined);  //max value for each selected location
 		}
 		//console.log('domainArrayMax: ', domainArrayMax.length, domainArrayMax)
 		//console.log('MAX 2: ', d3.max(domainArrayMax) )
-		if (domainArrayMax.length == 0) {
-			y2.domain([0,1])
+		// if (timeSeriesDomainArrayMax.length == 0) {
+		// 	y2.domain([0,1])
+		// } else {
+		// 	y2.domain([0, d3.max(timeSeriesDomainArrayMax) ]); 
+		// }	
+		//console.log('y2.domain = ', y2.domain())
+
+		let domainMax = d3.max(timeSeriesDomainArrayMax);
+		//cumulative log, value <= 5 or no values for selection:
+		if (((timeSeriesDomainArrayMax.length == 0)||(domainMax <= 5)) && (chartView.timeSeriesChart.viewAccumType == 'cumulative') && (timeSeriesScaleType == 'log')) {
+			y2.domain([1, 5]); 
+		//cumulative log, value > 0:
+		} else if ((timeSeriesScaleType == 'log') && (chartView.timeSeriesChart.viewAccumType == 'cumulative')) {
+			y2.domain([1, domainMax]); 
+		//value <= 5 or no values for selection - keep a min of 5 for y-axis:
+		} else if ((timeSeriesDomainArrayMax.length == 0) || (domainMax <= 5)) {
+			y2.domain([0, 5]);
 		} else {
-			y2.domain([0, d3.max(domainArrayMax) ]); 
-		}	
+			y2.domain([0, domainMax]); 
+		}
 		//console.log('y2.domain = ', y2.domain())
 
 
@@ -2678,12 +3322,26 @@ function tooltip(selectedData) {
 			})  //get correct color for current location
 			.attr("r", 2.5)
 			.merge(circles)
+			// .attr("cy", function(e) {
+			// 				//console.log('e: ', e); 
+			// 				let val = e.values.find(v => (sameDay(v.date, x0) && v.type === chartView.timeSeriesChart.viewStatType))[timeSeriesAccumType];
+			// 				return y2(val)
+			// 			})
+			// .attr("cx", x2(x0));
 			.attr("cy", function(e) {
-							//console.log('e: ', e); 
-							let val = e.values.find(v => (sameDay(v.date, x0) && v.type === chartView.timeSeriesChart.viewStatType))[currentAccumType];
-							return y2(val)
+							//console.log('e: ', e.values, x0); 
+							let val = e.values.find(v => (sameDay(v.date, x0) && v.type===chartView.timeSeriesChart.viewStatType))
+							if (val==null) return null;
+							else if ((chartView.timeSeriesChart.viewAccumType=='cumulative' && timeSeriesScaleType=='log') && (val[timeSeriesAccumType]==0)) return null;
+							else return y2(val[timeSeriesAccumType])
 						})
-			.attr("cx", x2(x0));
+			.attr("cx", x2(x0))
+			.style("opacity", function(d) {		//if the value is null (i.e. no outbreak) then hide the circle
+							let val = d.values.find(v => (sameDay(v.date, x0) && v.type===chartView.timeSeriesChart.viewStatType))
+							if (val==null) return 0;
+							else if ((chartView.timeSeriesChart.viewAccumType=='cumulative' && timeSeriesScaleType=='log') && (val[timeSeriesAccumType]==0)) return 0;
+							else return 1;
+						})
 
 
 		timeSeriesChart.select('.focus').selectAll(".lineHoverText")
@@ -2710,7 +3368,7 @@ function tooltip(selectedData) {
 			//console.log('values: ', values)
 			let val = values.find(v => sameDay(v.date, date) && v.type === chartView.timeSeriesChart.viewStatType);
 			if (val==undefined) return 'NA';
-			return formatNumber(val[currentAccumType]);
+			return formatNumber(val[timeSeriesAccumType]);
 		}
 
 	}
@@ -2722,37 +3380,83 @@ function obTooltip(outbreakData) {
 	//console.log('width4, height4: ', width4, height4)
 	//console.log('obTooltip outbreakData: ', outbreakData)
 	let data = outbreakData;
-	let x4 = d3.scaleLinear().range([0, width4]), //x-axis width, accounting for specified margins
-		y4 = d3.scaleLinear().range([height4, 0]);
+	let x4 = d3.scaleLinear().range([0, width4]); //x-axis width, accounting for specified margins
+	let y4 = function() {
+		if (chartView.outbreakChart.viewAccumType == 'daily') {
+			return d3.scaleLinear().range([height4, 0]);;
+		} else {
+			switch(outbreakScaleType) {
+					case 'linear': return d3.scaleLinear().range([height4, 0]);
+					case 'log': return d3.scaleLog().range([height4, 0]);
+					case 'default': return d3.scaleLinear().range([height4, 0]);
+			};
+		}		
+	}();
+	//y4 = d3.scaleLinear().range([height4, 0])
+	//y4 = d3.scaleLog().range([height4, 0])
+
 
 	let selectedOutbreakData = outbreakData.filter(d => selectedLocList.indexOf(d.locCode)!=-1);
-	let currentAccumType = chartView.outbreakChart.viewAccumType == 'daily' ? 'value' : 'cumVal';
+	//let currentAccumType = chartView.outbreakChart.viewAccumType == 'daily' ? 'value' : 'cumVal';
+	let currentAccumType = accumTypeOptions.find(acc => acc.key == chartView.outbreakChart.viewAccumType).dKey;
+	//console.log('currentAccumType: ', currentAccumType)
 
 
 	//FOR Y-DOMAIN: get max value for selectedOutbreakData (or if empty then for outbreakData)
-	let domainArray, domainArrayMax;
+	//First get all data for selected location outbreaks; if none selected then get all data for all locations for outbreaks
+	let outbreakDomainArray, outbreakDomainArrayMax, outbreakDomainArrayMin;
+	//let domainMin = 0;
 	if (selectedOutbreakData.length == 0) {
-		domainArray = outbreakData.filter(d => selectedLocList.indexOf(d.locCode) != -1)
+		outbreakDomainArray = outbreakData.filter(d => selectedLocList.indexOf(d.locCode) != -1)
 	} else {
-		domainArray = selectedOutbreakData.filter(d => selectedLocList.indexOf(d.locCode) != -1)
+		outbreakDomainArray = selectedOutbreakData.filter(d => selectedLocList.indexOf(d.locCode) != -1)
 	}
-	//console.log('domainArray: ', domainArray.length, domainArray)
+	//console.log('outbreakDomainArray xxx: ', outbreakDomainArray.length, outbreakDomainArray)
 
-
-	if (domainArray.length==0) {		
-		domainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined));  //max value for all locations
+	//Create array of max values for each location
+	if (outbreakDomainArray.length==0) {		
+		outbreakDomainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));  //max value/cumVal/percChange for all locations
 	} else {
-		domainArrayMax = domainArray.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined);  //max value for each selected location
+		outbreakDomainArrayMax = outbreakDomainArray.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));  //max value/cumVal/percChange for each selected location
 	}
-	//console.log('domainArrayMax: ', domainArrayMax.length, domainArrayMax)
+	//console.log('outbreakDomainArrayMax xxx: ', outbreakDomainArrayMax.length, outbreakDomainArrayMax)
+	
+	// if (currentAccumType == 'percChange') {
+	// 	if (domainArray.length==0) {		
+	// 		domainArrayMin = data.map(d => d3.min(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));;  //min percChange for all locations
+	// 	} else {
+	// 		domainArrayMin = domainArray.map(d => d3.min(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));  //min percChange for each selected location
+	// 	}
+	// 	console.log('domainArrayMin xxx: ', domainArrayMin)
+	// 	domainMin = d3.min(domainArrayMin)
+	// }
+	
+	// if (domainArrayMax.length == 0) {
+	// 	y4.domain([domainMin,1])
+	// 	//console.log('y4.domain xxx = ', [domainMin,1])
+	// } else {
+	// 	y4.domain([domainMin, d3.max(domainArrayMax) ]); 
+	// 	//console.log('y4.domain xxx = ', [domainMin, d3.max(domainArrayMax) ])
+	// }		
+	//console.log('y4.domain xxx = ', y4.domain())
 
-	if (domainArrayMax.length == 0) {
-		y4.domain([0,1])
-	} else {
-		y4.domain([0, d3.max(domainArrayMax) ]); 
-	}	
+	// if (outbreakScaleType == 'log') {
+	// 	y4.domain([1, d3.max(outbreakDomainArrayMax)]); 
+	// } else {
+	// 	y4.domain([0, d3.max(outbreakDomainArrayMax)]); 
+	// }
 	//console.log('y4.domain = ', y4.domain())
-
+	let domainMax = d3.max(outbreakDomainArrayMax);
+	if (((outbreakDomainArrayMax.length == 0)||(domainMax==0)) && (outbreakScaleType == 'log')) {
+		y4.domain([1, 1]); 
+	} else if ((outbreakScaleType == 'log') && (chartView.outbreakChart.viewAccumType == 'cumulative'))  {
+		y4.domain([1, domainMax]); 
+	} else if (outbreakDomainArrayMax.length == 0) {
+		y4.domain([0, 0]);
+	} else {
+		y4.domain([0, d3.max(outbreakDomainArrayMax)]); 
+	}
+	//console.log('y4.domain = ', y4.domain())
 
 	
 	let maxDayNum = 1;
@@ -2830,8 +3534,21 @@ function obTooltip(outbreakData) {
 			return d.dayNum; 
 		}).left;
 
-		let x4 = d3.scaleLinear().range([0, width4]), //x-axis width, accounting for specified margins
-			y4 = d3.scaleLinear().range([height4, 0])
+		let x4 = d3.scaleLinear().range([0, width4]); //x-axis width, accounting for specified margins
+		let y4 = function() {
+			if (chartView.outbreakChart.viewAccumType == 'daily') {
+				return d3.scaleLinear().range([height4, 0]);;
+			} else {
+				switch(outbreakScaleType) {
+						case 'linear': return d3.scaleLinear().range([height4, 0]);
+						case 'log': return d3.scaleLog().range([height4, 0]);
+						case 'default': return d3.scaleLinear().range([height4, 0]);
+				};
+			}		
+		}();
+		//y4 = d3.scaleLinear().range([height4, 0])
+		//y4 = d3.scaleLog().range([height4, 0])
+
 		x4.domain([1, maxDayNum]);
 		//x4.domain([minDate,maxDate]);
 		let x0 = x4.invert(d3.mouse(this)[0]);  //value hovered
@@ -2844,85 +3561,91 @@ function obTooltip(outbreakData) {
 			obData = outbreakData
 		}
 
-			let lengthOfOB;
-			let obLengths = outbreakData.map(d => {
-				lengthOfOB = d.values.filter(v => v.type === outbreakDay1Type).length
-				return {
-					loc: d.locCode,
-					length: lengthOfOB
-				}
-			})
-			//let maxOutbreakLengths = d3.sort(outbreakLengths, d => d.length)
-			//console.log('selectedOutbreakLengths: ', selectedOutbreakLengths)
-			//console.log('obData: ', obData)
-			let maxObLength = obLengths.sort(function (a, b) {
-				return b.length - a.length;
-			  })[0];
-			//console.log('maxObLength: ', maxObLength)
+		let lengthOfOB;
+		let obLengths = outbreakData.map(d => {
+			lengthOfOB = d.values.filter(v => v.type === outbreakDay1Type).length
+			return {
+				loc: d.locCode,
+				length: lengthOfOB
+			}
+		})
+		//let maxOutbreakLengths = d3.sort(outbreakLengths, d => d.length)
+		//console.log('selectedOutbreakLengths: ', selectedOutbreakLengths)
+		//console.log('obData: ', obData)
+		let maxObLength = obLengths.sort(function (a, b) {
+			return b.length - a.length;
+		})[0];
+		//console.log('maxObLength: ', maxObLength)
 
-			let idxMaxObLength = outbreakData.findIndex(d => d.locCode === maxObLength.loc)
-			//console.log('idxMaxObLength: ', idxMaxObLength)
+		let idxMaxObLength = outbreakData.findIndex(d => d.locCode === maxObLength.loc)
+		//console.log('idxMaxObLength: ', idxMaxObLength)
 
-			let firstLoc = outbreakData[idxMaxObLength].values.filter(v => v.type === chartView.outbreakChart.viewStatType);
-			//console.log('firstLoc: ', firstLoc)
-			const i = bisectDayNum(firstLoc, x0, 1);
-			//console.log('i: ', i)
-			const d0 = firstLoc[i - 1];
-			//console.log('d0: ', d0)
-			const d1 = firstLoc[i];
-			//console.log('d1: ', d1)
-			const currentPoint = x0 - d0['dayNum'] > d1['dayNum'] - x0 ? d1 : d0;
-			//console.log('currentPoint: ', currentPoint)
-			x0 = currentPoint.dayNum;
-			//console.log('x0: ', x0)
-		//} 
+		let firstLoc = outbreakData[idxMaxObLength].values.filter(v => v.type === chartView.outbreakChart.viewStatType);
+		//console.log('firstLoc: ', firstLoc)
+		const i = bisectDayNum(firstLoc, x0, 1);
+		//console.log('i: ', i)
+		const d0 = firstLoc[i - 1];
+		//console.log('d0: ', d0)
+		const d1 = firstLoc[i];
+		//console.log('d1: ', d1)
+		const currentPoint = x0 - d0['dayNum'] > d1['dayNum'] - x0 ? d1 : d0;
+		//console.log('currentPoint: ', currentPoint)
+		x0 = currentPoint.dayNum;
+		//console.log('x0: ', x0)
 		
 
-		// let domainArr, domainMaxArr = [];   //selectedOutbreakData == domainArr
-		
-		// //domainMaxArr = data.map(d => d3.max(d.values, rec => rec.value));  //max value for each location
-		// domainArr = outbreakData.filter(d => selectedLocList.indexOf(d.locCode)!=-1);  //data for selected locations only
-		// console.log('***** DOMAIN ARR: ', domainArr.length, domainArr)
-		// //console.log('domainArr.length: ', domainArr.length)
-		// console.log('***** selectedOutbreakData: ', selectedOutbreakData)
-		// if (domainArr.length==0) {
-		// 	domainMaxArr = outbreakData.map(d => d3.max(d.values, rec => rec.value));  //max value for all locations
-		// } else {
-		// 	domainMaxArr = domainArr.map(d => d3.max(d.values, rec => rec.value));  //max value for each selected location
-		// }
-		// //console.log('domainMaxArr: ', domainMaxArr)
-		// y4.domain([0, d3.max(domainMaxArr) ]); //.nice();
-		// //console.log('y2.domain = ', y2.domain())
-
-		//********* */
-		// //FOR Y-DOMAIN: get max value for selectedOutbreakData (or if empty then for outbreakData)
-		// let domainArray, domainArrayMax;
-		// //get max value for each selected loc (or all locs if none are selected)
-		// console.log('outbreakData: ', outbreakData)
-		// if (selectedOutbreakData.length == 0) {
-		// 	domainArray = outbreakData.filter(d => selectedLocList.indexOf(d.locCode) != -1)
-		// } else {
-		// 	domainArray = selectedOutbreakData.filter(d => selectedLocList.indexOf(d.locCode) != -1)
-		// }
-		// console.log('domainArray: ', domainArray.length, domainArray)
-
-		// //FOR Y-DOMAIN: get max value for selectedOutbreakData (or for all data if no selection)
-		let domainArrayMax;
-		if (domainArray.length==0) {		
-			domainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined);  //max value for all locations
+		//FOR Y-DOMAIN: get max value for selectedOutbreakData (or if empty then for outbreakData)
+		//First get all data for selected location outbreaks; if none selected then get all data for all locations for outbreaks
+		let outbreakDomainArray, outbreakDomainArrayMax, domainArrayMin;
+		//let domainMin = 0;
+		if (selectedOutbreakData.length == 0) {
+			outbreakDomainArray = outbreakData.filter(d => selectedLocList.indexOf(d.locCode) != -1)
 		} else {
-			domainArrayMax = selectedOutbreakData.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined);  //max value for each selected location
+			outbreakDomainArray = selectedOutbreakData.filter(d => selectedLocList.indexOf(d.locCode) != -1)
 		}
-		//console.log('domainArrayMax: ', domainArrayMax.length, domainArrayMax)
+		//console.log('outbreakDomainArray: ', outbreakDomainArray.length, outbreakDomainArray)
 
-		if (domainArrayMax.length == 0) {
-			y4.domain([0,1])
+		//Create array of max values for each location
+		if (outbreakDomainArray.length==0) {		
+			outbreakDomainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));  //max value/cumVal/percChange for all locations
 		} else {
-			y4.domain([0, d3.max(domainArrayMax) ]); 
-		}	
+			outbreakDomainArrayMax = outbreakDomainArray.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));  //max value/cumVal/percChange for each selected location
+		}
+		//console.log('outbreakDomainArrayMax: ', outbreakDomainArrayMax.length, outbreakDomainArrayMax)
+		
+		// if (currentAccumType == 'percChange') {
+		// 	if (domainArray.length==0) {		
+		// 		domainArrayMin = data.map(d => d3.min(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));;  //min percChange for all locations
+		// 	} else {
+		// 		domainArrayMin = domainArray.map(d => d3.min(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));  //min percChange for each selected location
+		// 	}
+		// 	//console.log('domainArrayMin: ', domainArrayMin)
+		// 	domainMin = d3.min(domainArrayMin)
+		// }
+
+		// if (domainArrayMax.length == 0) {
+		// 	y4.domain([domainMin,1])
+		// } else {
+		// 	y4.domain([domainMin, d3.max(domainArrayMax) ]); 
+		// }	
 		//console.log('y4.domain = ', y4.domain())
-
-
+		// if (outbreakScaleType == 'log') {
+		// 	y4.domain([1, d3.max(outbreakDomainArrayMax)]); 
+		// } else {
+		// 	y4.domain([0, d3.max(outbreakDomainArrayMax)]); 
+		// }
+		//console.log('y4.domain = ', y4.domain())
+		let domainMax = d3.max(outbreakDomainArrayMax);
+		if (((outbreakDomainArrayMax.length == 0)||(domainMax==0)) && (outbreakScaleType == 'log')) {
+			y4.domain([1, 1]); 
+		} else if ((outbreakScaleType == 'log') && (chartView.outbreakChart.viewAccumType == 'cumulative')) {
+			y4.domain([1, domainMax]); 
+		} else if (outbreakDomainArrayMax.length == 0) {
+			y4.domain([0, 0]);
+		} else {
+			y4.domain([0, d3.max(outbreakDomainArrayMax)]); 
+		}
+		//console.log('y4.domain = ', y4.domain())
 
 
 		outbreakDayChart.select('.o_focus').select(".o_lineHover")
@@ -2944,7 +3667,9 @@ function obTooltip(outbreakData) {
 			.attr("cy", function(e) {
 							//console.log('e: ', e.values, x0); 
 							let val = e.values.find(v => (v.dayNum == x0 && v.type===chartView.outbreakChart.viewStatType))
+							//console.log('cy: ', val, currentAccumType, val[currentAccumType], y4(val[currentAccumType]))
 							if (val==null) return null;
+							else if ((chartView.outbreakChart.viewAccumType=='cumulative' && outbreakScaleType=='log') && (val[currentAccumType]==0)) return null;
 							else return y4(val[currentAccumType])
 							// let val = e.values.find(v => (v.dayNum == x0 && v.type===chartView.outbreakChart.viewStatType)).value;
 							// return y4(val.value);
@@ -2953,6 +3678,7 @@ function obTooltip(outbreakData) {
 			.style("opacity", function(d) {		//if the value is null (i.e. no outbreak) then hide the circle
 							let val = d.values.find(v => (v.dayNum == x0 && v.type===chartView.outbreakChart.viewStatType))
 							if (val==null) return 0;
+							else if ((chartView.outbreakChart.viewAccumType=='cumulative' && outbreakScaleType=='log') && (val[currentAccumType]==0)) return 0;
 							else return 1;
 						})
 
@@ -2987,7 +3713,9 @@ function obTooltip(outbreakData) {
 			let maxLocDayNum = d3.max(values, v => v['dayNum'])
 			//console.log(locCode, dayNum, maxLocDayNum)
 			if ((val==undefined) && (dayNum >= maxLocDayNum)) return 'NA'; // '?'
-			else if (val==undefined) return 'No outbreak'
+			else if (val==undefined) return 'No outbreak';
+			//console.log('GET VALUE: ', val[currentAccumType], formatNumber(val[currentAccumType]))
+			//if (currentAccumType == 'percChange') return d3.format(",.2%")(val[currentAccumType]);
 			return formatNumber(val[currentAccumType]) + ' (' + formatDate(val.date, 'daymonth') + ')';
 		}
 
@@ -3238,6 +3966,7 @@ function getBarColor(loc, top10) {
 
 function resize() {
 	//Update svg dimensions:
+	//console.log('resize locationChart width ', $(id1a).width())
 	width1a = $(id1a).width() - margin[id1a].left - margin[id1a].right, //width of main svg1a
 	height1a = svgDimensions[id1a].height - margin[id1a].top - margin[id1a].bottom; //height of main svg1a
 
@@ -3297,28 +4026,76 @@ function changeOutbreakType(opt) {
 }
 
 function changeOutbreakNum(opt) {
-	console.log('changed outbreak number: ', opt)
-	outbreakDay1Num = parseInt(opt);
+	//let outbreakDay1ArrayForDropdown = [1,2,3,4,5,10,15,20,25,50,100];
+	//console.log('changed outbreak number: ', opt)
+	outbreakDay1Num = outbreakDay1ArrayForDropdown[parseInt(opt)];
+	//console.log(opt, ' -> outbreakDay1Num value ', outbreakDay1Num)
 	//document.getElementById('outbreak_day1_num').innerHTML = outbreakDay1Num;
 
 	calculateOutbreakDay1();
 	updateOutbreakDayChart();
 }
 
+function initLocSearchDropdown() {
+	//console.log('in initLocSearchDropdown')
+	let dropdownHTML = '';
+	//dropdownHTML = '<input type="text" placeholder="Search..." id="searchInput" onkeyup="filterFunction()">'
+	let locDropdownList = locationList.map(loc => ({key: loc.code, name: getLocNameFromCode(loc.code) }) );
+	locDropdownList.sort((a, b) => (a.name > b.name) ? 1 : -1)
+	//console.log('locDropdownList:', locDropdownList)
+	//dropdownHTML += '<ul id="searchUL">';
+	locDropdownList.forEach(loc => {
+		//dropdownHTML += '<li><a class="locSearchName" onclick="searchClick(\'' + loc.key + '\')">' + loc.name + '</a></li>'
+		dropdownHTML += '<a class="locSearchName" onclick="searchClick(\'' + loc.key + '\')">' + loc.name + '</a>'
+
+	})
+	dropdownHTML += '<a class="locSearchName" id="noLocSearch">No Location</a>'  
+
+	//dropdownHTML += '</ul>';
+	//console.log('dropdownHTML: ', dropdownHTML)
+	document.getElementById("locSearchDropdown").innerHTML = dropdownHTML;
+	document.getElementById("noLocSearch").style.display = "none";
+}
+
 
 (function initOutbreakDropDowns() {
-	console.log('initOutbreakDropDowns: ', outbreakDay1Num, outbreakDay1Type)
+	//console.log('initOutbreakDropDowns: ', outbreakDay1Num, outbreakDay1Type)
 
-	let days = [...Array(outbreakDay1MaxNumForDropdown + 1).keys()];
-	days.shift();
+	// let days = [...Array(outbreakDay1MaxNumForDropdown + 1).keys()];
+	// days.shift();	
+	// //console.log('days:', days)
+
+	// days.forEach(day => {
+	// 	ob_day1_num.options[day-1] = new Option(day, day);
+	// })
+	// ob_day1_num.selectedIndex = outbreakDay1Num - 1;
+	// //document.getElementById('outbreak_day1_num').innerHTML = outbreakDay1Num;
+
+	// statTypeOptions.forEach((type, i) => {
+	// 	ob_day1_type.options[i] = new Option(statTypeOptions[i].text, statTypeOptions[i].key)
+	// })
+
+	// let idx = statTypeOptions.findIndex(type => type.key == outbreakDay1Type);
+	// ob_day1_type.selectedIndex =  idx;
+	// outbreakDay1Type = statTypeOptions[idx].key;
+
+
+	//------------------------------------------------
+	let days = outbreakDay1ArrayForDropdown;	
 	//console.log('days:', days)
 
-	days.forEach(day => {
-		ob_day1_num.options[day-1] = new Option(day, day);
+	days.forEach((day, i) => {
+		//console.log('day, i:', day, i)
+		ob_day1_num.options[i] = new Option(day, i);
+		//console.log('ob_day1_num:', ob_day1_num)
 	})
-	ob_day1_num.selectedIndex = outbreakDay1Num - 1;
-	//document.getElementById('outbreak_day1_num').innerHTML = outbreakDay1Num;
-
+	//console.log('outbreakDay1Num', outbreakDay1Num)
+	let dayNumIdx = days.findIndex(day => {
+		//console.log('day ', day)
+		return day == outbreakDay1Num;
+	});
+	ob_day1_num.selectedIndex = dayNumIdx;
+	//console.log('ob_day1_num.selectedIndex:', ob_day1_num.selectedIndex)
 
 	statTypeOptions.forEach((type, i) => {
 		ob_day1_type.options[i] = new Option(statTypeOptions[i].text, statTypeOptions[i].key)
@@ -3327,7 +4104,6 @@ function changeOutbreakNum(opt) {
 	let idx = statTypeOptions.findIndex(type => type.key == outbreakDay1Type);
 	ob_day1_type.selectedIndex =  idx;
 	outbreakDay1Type = statTypeOptions[idx].key;
-	//document.getElementById('outbreak_day1_type').innerHTML = statTypeOptions[idx].text;
 
 	//console.log('initOutbreakDropDowns: ', outbreakDay1Num, outbreakDay1Type)	
 })();
@@ -3382,6 +4158,8 @@ $(document).ready(function () {
 			// console.log('parsed DEATHS data: ', parsedDeathsData)
 			let processedData = processHDXData(parsedConfirmedCasesData.data, parsedDeathsData.data)
 			// console.log('processed data: ', processedData)
+
+			initLocSearchDropdown();
 			
 			calculateOutbreakDay1(processedData);
 			createCharts(processedData);
@@ -3434,6 +4212,8 @@ $(document).ready(function () {
 			//console.log('parsed data: ', parsedData)
 			let processedData = processData(parsedData.data)
 			//console.log('processed data: ', processedData)
+
+			initLocSearchDropdown();
 			
 			calculateOutbreakDay1(processedData);
 			createCharts(processedData);
