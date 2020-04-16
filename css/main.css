@@ -370,7 +370,7 @@ path {
   font-size: 0.6rem;
   border: none;
   cursor: pointer;
-  min-width: 8rem;
+  max-width: 7.5rem;
 }
 
 .dropbtn:hover, .dropbtn:focus {
@@ -396,8 +396,8 @@ path {
 
 .dropdown {
   position: relative;
-  margin-bottom: 0rem;
-  margin-top: -1.4rem;
+  margin-bottom: -1.4rem;
+  /* margin-top: -1.4rem; */
   /* display: inline-block; */
 }
 
