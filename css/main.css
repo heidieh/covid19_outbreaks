@@ -64,7 +64,7 @@ body {
 
 #timeseries-chart {
   margin-top: 0rem;
-  margin-bottom: 0.6rem;
+  margin-bottom: 1.2rem;
   width: 100%;
   min-width: 500px;
 }
@@ -93,6 +93,11 @@ body {
   margin-bottom: 0.2rem;
 }
 
+#locSearch {
+  position: absolute;
+  margin-bottom: -1rem;
+  font-size: 0.6rem;
+}
 
 #loc-type-chart-a {
   margin-bottom: 8px; 
@@ -138,7 +143,8 @@ body {
 }
 
 #outbreak-type-btns, #outbreak-total-btns,
-#timeSeries-type-btns, #timeSeries-total-btns {
+#timeSeries-type-btns, #timeSeries-total-btns,
+#outbreak-scale-btns, #timeSeries-scale-btns {
   display: inline-block;
 } 
 
@@ -216,6 +222,39 @@ body {
   margin-right: -0.25rem;
 }
 
+
+/* .custom-btn-1 {
+  border-radius: 0.375rem 0rem 0rem 0.375rem;
+  margin-left: 1rem;
+}
+
+.custom-btn-2 {
+  border-radius: 0rem;
+  margin-right: 0rem;
+}
+
+.custom-btn-3 {
+  border-radius: 0rem 0.375rem 0.375rem 0rem;
+  margin-right: -0.25rem;
+} */
+
+
+#outbreak-scale-btns {
+  position: absolute;
+  margin: 0.25rem 0rem 0rem 0.5rem;
+}
+
+#timeSeries-scale-btns {
+  position: absolute;
+  margin: 0.25rem 0rem 0rem 3rem;
+}
+
+.scale-btn {
+  padding: 2px 6px;
+  font-size: 0.5rem;
+}
+
+
 .grid line {
   stroke: lightgrey;
   stroke-opacity: 0.7;
@@ -257,8 +296,6 @@ hr {
 /* ALL CHARTS */
 path {
   fill: none;
-  /* stroke-width: 1; */
-  /* stroke: #ed3700; */
 }
 
 .axis path,
@@ -322,3 +359,67 @@ path {
 .hide-loader{
   display:none;
 }
+
+
+
+/* ***** Search dropdown ***** */
+.dropbtn {
+  background-color: #e1cfd3;
+  color: white;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.6rem;
+  border: none;
+  cursor: pointer;
+}
+
+.dropbtn:hover, .dropbtn:focus {
+  background-color: #ddd;
+}
+
+
+#locSearchInput {
+  box-sizing: border-box;
+  background-image: url('../imgs/search-icon.svg');
+  background-position: 0.2rem 0.2rem;
+  background-repeat: no-repeat;  
+  
+  font-size: 0.6rem;
+  color: #660066;
+  padding: 0.25rem 0rem 0.25rem 1.5rem;
+  border: none;
+  border-bottom: 1px solid #ddd;
+} 
+
+#locSearchInput:focus {outline: 3px solid #ddd;}
+
+
+.dropdown {
+  position: relative;
+  margin-bottom: -1.4rem;
+  /* display: inline-block; */
+}
+
+
+.dropdown-content {
+  display: none;
+  color: #8c198c;
+  position: absolute;
+  max-height: 140px;
+  font-size: 0.6rem;
+  padding: 0.3rem 0.5rem;
+  background-color: #f6f6f6;
+  min-width: 10rem;
+  overflow: auto; 
+  border: 1px solid #ddd;
+  z-index: 1;
+}
+
+.dropdown-content a {
+  padding: 0.15rem 0.5rem;
+  text-decoration: none;
+  display: block;
+}
+
+.dropdown a:hover {background-color: #ddd;}
+
+.show {display: block;}
