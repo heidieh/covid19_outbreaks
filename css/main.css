@@ -366,10 +366,11 @@ path {
 .dropbtn {
   background-color: #e1cfd3;
   color: white;
-  padding: 0.3rem 0.5rem;
+  padding: 0.3rem 0.3rem;
   font-size: 0.6rem;
   border: none;
   cursor: pointer;
+  min-width: 8rem;
 }
 
 .dropbtn:hover, .dropbtn:focus {
@@ -395,7 +396,8 @@ path {
 
 .dropdown {
   position: relative;
-  margin-bottom: -1.4rem;
+  margin-bottom: 0rem;
+  margin-top: -1.4rem;
   /* display: inline-block; */
 }
 
@@ -408,7 +410,7 @@ path {
   font-size: 0.6rem;
   padding: 0.3rem 0.5rem;
   background-color: #f6f6f6;
-  min-width: 10rem;
+  min-width: 8rem;
   overflow: auto; 
   border: 1px solid #ddd;
   z-index: 1;
