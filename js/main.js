@@ -165,9 +165,9 @@ let width5 = svgDimensions[id5].width - margin[id5].left - margin[id5].right, //
 
 
 function processHDXData(origConfCasesData, origDeathsData) {
-	//console.log('-------------- PROCESS HDX DATA: -----------------')
-	// console.log('original ConfCasesData in processData: ', origConfCasesData)
-	// console.log('original DeathsData in processData: ', origDeathsData)
+	console.log('-------------- PROCESS HDX DATA: -----------------')
+	console.log('original ConfCasesData in processData: ', origConfCasesData)
+	console.log('original DeathsData in processData: ', origDeathsData)
 	let processedData = [];
 	let locCode, currentLocCode;
 	let temp;
@@ -3826,7 +3826,7 @@ function obTooltip(outbreakData) {
 			if ((val==undefined) && (dayNum >= maxLocDayNum)) return 'NA'; // '?'
 			else if (val==undefined) return 'No outbreak';
 			//console.log('GET VALUE: ', val[currentAccumType], formatNumber(val[currentAccumType]))
-			if (currentAccumType == 'rollAvg') return d3.format(",.0f")(val[currentAccumType]);
+			if (currentAccumType == 'rollAvg') return d3.format(",.0f")(val[currentAccumType]) + ' (' + formatDate(val.date, 'daymonth') + ')';
 			return formatNumber(val[currentAccumType]) + ' (' + formatDate(val.date, 'daymonth') + ')';
 		}
 
