@@ -47,27 +47,30 @@ let outbreakNumDaysUnfulfilledForEndDay = 14;  //i.e. 2 weeks incubation
 //let outbreakDay1MaxNumForDropdown= 20;
 let outbreakDay1ArrayForDropdown = [1,2,3,4,5,10,15,20,25,50,100];
 
-//let numDaysForRollingAvgPercChange = 14;
+let numDaysForRollingAvg = 7;
 
 
 let statTypeOptions = [ {key: 'confirmed', text: 'confirmed cases', textCamel: 'Confirmed Cases'}, 
 						{key: 'death', text: 'deaths', textCamel: 'Deaths'}
 						];  
 let accumTypeOptions = [ {key: 'daily', dKey: 'value', text: 'daily', textCamel: 'Daily' }, 
-						 {key: 'cumulative', dKey: 'cumVal', text: 'cumulative', textCamel: 'Cumulative' }
+						 {key: 'cumulative', dKey: 'cumVal', text: 'cumulative', textCamel: 'Cumulative' },
+						 {key: 'dailySmooth', dKey: 'rollAvg', text: 'daily smoothed', textCamel: 'Daily (smoothed)' }
 						 //{key: 'percChange', dKey: 'percChange', text: '% change', textCamel: '% Change' }
 					   ]	
 let outbreakScaleType = 'linear'; //log/linear	
-let timeSeriesScaleType = 'linear'; //log/linear				  
+let timeSeriesScaleType = 'linear'; //log/linear	
+
+let showBackgroundOutbreakLines = true;
 
 //initial views						  
 let chartView = {
 	locRowChart: { viewStatType: 'confirmed' },
-	outbreakChart: { viewStatType: 'confirmed', viewAccumType: 'daily' },  
-	timeSeriesChart: { viewStatType: 'confirmed', viewAccumType: 'daily' }
+	outbreakChart: { viewStatType: 'confirmed', viewAccumType: 'dailySmooth' },  
+	timeSeriesChart: { viewStatType: 'confirmed', viewAccumType: 'dailySmooth' }
 }
 //let viewStatType = 'confirmed';   	// typeStatType = confirmed/death			
-//let viewAccumType = 'daily';		// viewAccumType = daily/cumulative/percChange
+//let viewAccumType = 'daily';		// viewAccumType = daily/dailySmooth/cumulative
 						  
 let countryCodes;
 let allData;
@@ -158,7 +161,11 @@ let width5 = svgDimensions[id5].width - margin[id5].left - margin[id5].right, //
 //console.log('width3 x height3: ', width5, ' x ', height5);
 
 
+
+
+
 function processHDXData(origConfCasesData, origDeathsData) {
+	//console.log('-------------- PROCESS HDX DATA: -----------------')
 	// console.log('original ConfCasesData in processData: ', origConfCasesData)
 	// console.log('original DeathsData in processData: ', origDeathsData)
 	let processedData = [];
@@ -228,6 +235,8 @@ function processHDXData(origConfCasesData, origDeathsData) {
 	});
 	//console.log('processed data H: ', processedData)
 
+
+	//sort by type (confirmed/deaths) then date
 	processedData.forEach(loc => loc.values.sort(function (loc1, loc2) {
 		if (loc1.type > loc2.type) return 1;
 		if (loc1.type < loc2.type) return -1;
@@ -287,6 +296,36 @@ function processHDXData(origConfCasesData, origDeathsData) {
 		
 	})
 
+
+	//calculate rolling average
+	let rollAvgCases, rollAvgDeaths;
+	processedData.forEach(loc => {
+		// if (loc['locCode'] == 'ITA_1') console.log('--ITALY--')
+		// if (loc['locCode'] == 'ITA_1') console.log('rollAvgCase: ', rollAvgCase)
+		rollAvgCases = [];
+		rollAvgDeaths = [];
+		loc['values'].forEach(vals => {
+			if (vals['type'] == 'confirmed') {	
+				if (rollAvgCases.length == numDaysForRollingAvg) {
+					vals['rollAvg'] = parseInt(rollAvgCases.reduce((a,b) => a + b, 0) / rollAvgCases.length);
+					rollAvgCases.pop();	//remove element from end of array
+				} else {
+					vals['rollAvg'] = null;
+				}
+				rollAvgCases.unshift(vals['value']);  //add element to beginning of array
+				//if (loc['locCode'] == 'ITA_1') console.log('rollAvgCases: ', rollAvgCases)
+			} else if (vals['type'] == 'death') {
+				if (rollAvgDeaths.length == numDaysForRollingAvg) {
+					vals['rollAvg'] = parseInt(rollAvgDeaths.reduce((a,b) => a + b, 0) / rollAvgDeaths.length);
+					rollAvgDeaths.pop();
+				} else {
+					vals['rollAvg'] = null;
+				}
+				rollAvgDeaths.unshift(vals['value']);
+			}
+		})
+	})
+
 	// console.log('final location list: ', locationList)
 	// console.log('countries not found ISO3: ', locationErrorList)
 	// console.log('final processed data: ', processedData)
@@ -297,7 +336,7 @@ function processHDXData(origConfCasesData, origDeathsData) {
 
 
 function processData(origData) {
-	// console.log('-------------- PROCESS DATA: -----------------')
+	console.log('-------------- PROCESS RK DATA: -----------------')
 	// console.log('originalData in processData: ', origData)	
 	// console.log('location list: ', locationList)
 	// console.log('country codes in processData: ', countryCodes)
@@ -372,6 +411,36 @@ function processData(origData) {
 		})
 	})
 
+	
+	//calculate rolling average
+	let rollAvgCases, rollAvgDeaths;
+	processedData.forEach(loc => {
+		// if (loc['locCode'] == 'ITA_1') console.log('--ITALY--')
+		// if (loc['locCode'] == 'ITA_1') console.log('rollAvgCase: ', rollAvgCase)
+		rollAvgCases = [];
+		rollAvgDeaths = [];
+		loc['values'].forEach(vals => {
+			if (vals['type'] == 'confirmed') {	
+				if (rollAvgCases.length == numDaysForRollingAvg) {
+					vals['rollAvg'] = parseInt(rollAvgCases.reduce((a,b) => a + b, 0) / rollAvgCases.length);
+					rollAvgCases.pop();	//remove element from end of array
+				} else {
+					vals['rollAvg'] = null;
+				}
+				rollAvgCases.unshift(vals['value']);  //add element to beginning of array
+				//if (loc['locCode'] == 'ITA_1') console.log('rollAvgCases: ', rollAvgCases)
+			} else if (vals['type'] == 'death') {
+				if (rollAvgDeaths.length == numDaysForRollingAvg) {
+					vals['rollAvg'] = parseInt(rollAvgDeaths.reduce((a,b) => a + b, 0) / rollAvgDeaths.length);
+					rollAvgDeaths.pop();
+				} else {
+					vals['rollAvg'] = null;
+				}
+				rollAvgDeaths.unshift(vals['value']);
+			}
+		})
+	})
+
 	// //calculate percentage change values (with 5 day rolling average)
 	// let percChangeCas, percChangeDeath;
 	// let rollingAvgCases = [], rollingAvgDeaths = [];
@@ -427,9 +496,9 @@ function processData(origData) {
 	minDate = new Date(Math.min.apply(null, datesArr));
 	document.getElementById('update_date').innerHTML = 'Data to: <i>' + formatDate(maxDate, 'long') + '</i>';
 
-	//console.log('final location list: ', locationList)
+	console.log('final location list: ', locationList)
 	// console.log('countries not found ISO3: ', locationErrorList)
-	//console.log('*** final processed data: ', processedData)
+	console.log('*** final processed data: ', processedData)
 	return processedData;
 }
 
@@ -1075,23 +1144,29 @@ function createCharts(data) {
 
 // ************* CREATE TIMESERIES CHART ***************** //
 
-		//add scale btns if accumulator type is cumulative
+		//set timeSeries accumulator type 
 		let timeSeriesAccumType = accumTypeOptions.find(acc => acc.key == chartView.timeSeriesChart.viewAccumType).dKey;
 		//console.log('timeSeriesAccumType: ', timeSeriesAccumType, chartView.timeSeriesChart.viewAccumType)
 
+		//create scale buttons (log/linear)
 		let tSScaleBtnHTML = "";
-		tSScaleBtnHTML = "<button id='timeseries-scale-log-btn' class='button scale-btn custom-btn custom-btn-2' onclick='changeTimeSeriesScale(\"log\")'>Log</button>";
-		tSScaleBtnHTML += "<button id='timeseries-scale-linear-btn' class='button scale-btn custom-btn custom-btn-1' onclick='changeTimeSeriesScale(\"linear\")'>Linear</button>";
-		
-		if (!(chartView.timeSeriesChart.viewAccumType == 'cumulative')) {
+		tSScaleBtnHTML = "<button id='timeseries-scale-log-btn' class='button scale-btn custom-btn custom-btn-2of2' onclick='changeTimeSeriesScale(\"log\")'>Log</button>";
+		tSScaleBtnHTML += "<button id='timeseries-scale-linear-btn' class='button scale-btn custom-btn custom-btn-1of2' onclick='changeTimeSeriesScale(\"linear\")'>Linear</button>";
+		document.getElementById('timeSeries-scale-btns').innerHTML = tSScaleBtnHTML;
+
+		//if accumulator is 'daily' then hide scale buttons
+		if (chartView.timeSeriesChart.viewAccumType == 'daily') {
 			document.getElementById('timeSeries-scale-btns').style.display = 'none';
 		}
-		document.getElementById('timeSeries-scale-btns').innerHTML = tSScaleBtnHTML;
+
+		//turn on default scale button
 		if (timeSeriesScaleType == 'linear') {
 			document.getElementById('timeseries-scale-linear-btn').classList.add('on');
 		} else if (timeSeriesScaleType == 'log') {
 			document.getElementById('timeseries-scale-log-btn').classList.add('on');
 		}
+
+
 
 
 		//Render main SVGs
@@ -1164,10 +1239,10 @@ function createCharts(data) {
 
 		let tSDomainMax = d3.max(timeSeriesDomainArrayMax);
 		//cumulative log, value <= 5 or no values for selection:
-		if (((timeSeriesDomainArrayMax.length == 0)||(tSDomainMax <= 5)) && (chartView.timeSeriesChart.viewAccumType == 'cumulative') && (timeSeriesScaleType == 'log')) {
+		if (((timeSeriesDomainArrayMax.length == 0)||(tSDomainMax <= 5)) && (timeSeriesScaleType == 'log') && (['dailySmooth', 'cumulative'].includes(chartView.timeSeriesChart.viewAccumType))) {
 			y2.domain([1, 5]); 
-		//cumulative log, value > 0:
-		} else if ((timeSeriesScaleType == 'log') && (chartView.timeSeriesChart.viewAccumType == 'cumulative')) {
+		//cumulative or dailySmooth log, value > 0:
+		} else if ((timeSeriesScaleType == 'log') && (['dailySmooth', 'cumulative'].includes(chartView.timeSeriesChart.viewAccumType))) {
 			y2.domain([1, tSDomainMax]); 
 		//value <= 5 or no values for selection - keep a min of 5 for y-axis:
 		} else if ((timeSeriesDomainArrayMax.length == 0) || (tSDomainMax <= 5)) {
@@ -1176,8 +1251,6 @@ function createCharts(data) {
 			y2.domain([0, tSDomainMax]); 
 		}
 		//console.log('y2.domain = ', y2.domain())
-
-
 
 
 
@@ -1215,11 +1288,21 @@ function createCharts(data) {
 					return "rotate(-90) translate(-110, -50)" 
 				} else if ((chartView.timeSeriesChart.viewStatType === 'death') && (chartView.timeSeriesChart.viewAccumType === "cumulative")) {
 					return "rotate(-90) translate(-86, -50)" 
+				} else if ((chartView.timeSeriesChart.viewStatType === 'confirmed') && (chartView.timeSeriesChart.viewAccumType === "dailySmooth")) {
+					return "rotate(-90) translate(-110, -50)" 
+				} else if ((chartView.timeSeriesChart.viewStatType === 'death') && (chartView.timeSeriesChart.viewAccumType === "dailySmooth")) {
+					return "rotate(-90) translate(-100, -50)" 
 				} else {
 					return "" 
 				}
 			})  
-			.text(y_ts_title);
+			.text(function() {
+				if ((chartView.timeSeriesChart.viewStatType === 'confirmed') && (chartView.timeSeriesChart.viewAccumType === "dailySmooth")) {
+					return 'Daily (smoothed) Conf Cases'; 
+				} else {
+					return y_ts_title
+				}
+			});	
 
 		
 
@@ -1257,15 +1340,13 @@ function createCharts(data) {
 				// if (d[timeSeriesAccumType] <= 0) return height2 + 10;
 				// else return y2(d[timeSeriesAccumType]); 
 
-				if ((chartView.timeSeriesChart.viewAccumType == 'cumulative')&& (timeSeriesScaleType == 'log')) {
+				if (['dailySmooth', 'cumulative'].includes(chartView.timeSeriesChart.viewAccumType) && (timeSeriesScaleType == 'log')) {
 					//console.log('y: ', d[currentAccumType], ' -> ', d[currentAccumType] <= 0 ? height4 : y4(d[currentAccumType]));
 					return d[timeSeriesAccumType] <= 0 ? height2 + 10 : y2(d[timeSeriesAccumType]); 
 				} else {
 					return y2(d[timeSeriesAccumType]); 
 				}
-
 			}); 
-			
 			//.y(function(d) { return d[timeSeriesAccumType] <= 0 ? 0 : y2(d[timeSeriesAccumType]); }); 
 			//.y(function(d) { console.log('locationLine: ', d[timeSeriesAccumType], ' -> ', y2(d[timeSeriesAccumType])); return d[timeSeriesAccumType]<=0? 0 : y2(d[timeSeriesAccumType]); });  //rename to y4Scale???
 
@@ -1362,19 +1443,19 @@ function createCharts(data) {
 
 // ************* CREATE OUTBREAK DAY CHART ***************** //
 
-		//add scale btns if accumulator type is cumulative
-		//let currentAccumType = accumTypeOptions.find(acc => acc.key == chartView.outbreakChart.viewAccumType).dKey;
-		//console.log('currentAccumType: ', currentAccumType, chartView.outbreakChart.viewAccumType)
 
+		//create scale buttons (log/linear)
 		let scaleBtnHTML = "";
-		//if (chartView.outbreakChart.viewAccumType == 'cumulative') {
-			scaleBtnHTML = "<button id='outbreak-scale-log-btn' class='button scale-btn custom-btn custom-btn-2' onclick='changeOutbreakScale(\"log\")'>Log</button>";
-			scaleBtnHTML += "<button id='outbreak-scale-linear-btn' class='button scale-btn custom-btn custom-btn-1' onclick='changeOutbreakScale(\"linear\")'>Linear</button>";
-		//}
-		if (!(chartView.outbreakChart.viewAccumType == 'cumulative')) {
+		scaleBtnHTML = "<button id='outbreak-scale-log-btn' class='button scale-btn custom-btn custom-btn-2of2' onclick='changeOutbreakScale(\"log\")'>Log</button>";
+		scaleBtnHTML += "<button id='outbreak-scale-linear-btn' class='button scale-btn custom-btn custom-btn-1of2' onclick='changeOutbreakScale(\"linear\")'>Linear</button>";
+		document.getElementById('outbreak-scale-btns').innerHTML = scaleBtnHTML;
+
+		//if accumulator is 'daily' then hide scale buttons
+		if (chartView.outbreakChart.viewAccumType == 'daily') {
 			document.getElementById('outbreak-scale-btns').style.display = 'none';
 		}
-		document.getElementById('outbreak-scale-btns').innerHTML = scaleBtnHTML;
+		
+		//turn on default scale button
 		if (outbreakScaleType == 'linear') {
 			document.getElementById('outbreak-scale-linear-btn').classList.add('on');
 		} else if (outbreakScaleType == 'log') {
@@ -1394,7 +1475,7 @@ function createCharts(data) {
 		let x4 = d3.scaleLinear().range([0, width4]); //x-axis width, accounting for specified margins
 		let y4 = function() {
 			if (chartView.outbreakChart.viewAccumType == 'daily') {
-				return d3.scaleLinear().range([height4, 0]);;
+				return d3.scaleLinear().range([height4, 0]);
 			} else {
 				switch(outbreakScaleType) {
 						case 'linear': return d3.scaleLinear().range([height4, 0]);
@@ -1477,9 +1558,9 @@ function createCharts(data) {
 		// }
 		//console.log('y4.domain: ', y4.domain())
 		let domainMax = d3.max(outbreakDomainArrayMax);
-		if (((outbreakDomainArrayMax.length == 0)||(domainMax==0)) && (outbreakScaleType == 'log')) {
+		if (((outbreakDomainArrayMax.length == 0)||(domainMax==0)) && (outbreakScaleType == 'log') && ['dailySmooth', 'cumulative'].includes(chartView.outbreakChart.viewAccumType)) {
 			y4.domain([1, 1]); 
-		} else if ((outbreakScaleType == 'log') && (chartView.outbreakChart.viewAccumType == 'cumulative')) {
+		} else if ((outbreakScaleType == 'log') && (['dailySmooth', 'cumulative'].includes(chartView.outbreakChart.viewAccumType))) {
 			y4.domain([1, domainMax]); 
 		} else if (outbreakDomainArrayMax.length == 0) {
 			y4.domain([0, 0]);
@@ -1525,6 +1606,10 @@ function createCharts(data) {
 					return "rotate(-90) translate(-190, -50)" 
 				} else if ((chartView.outbreakChart.viewStatType === 'death') && (chartView.outbreakChart.viewAccumType === "cumulative")) {
 					return "rotate(-90) translate(-165, -50)" 
+				} else if ((chartView.outbreakChart.viewStatType === 'confirmed') && (chartView.outbreakChart.viewAccumType === "dailySmooth")) {
+					return "rotate(-90) translate(-200, -50)" 
+				} else if ((chartView.outbreakChart.viewStatType === 'death') && (chartView.outbreakChart.viewAccumType === "dailySmooth")) {
+					return "rotate(-90) translate(-180, -50)" 
 				// } else if ((chartView.outbreakChart.viewStatType === 'confirmed') && (chartView.outbreakChart.viewAccumType === "percChange")) {
 				// 	return "rotate(-90) translate(-200, -50)" 
 				// } else if ((chartView.outbreakChart.viewStatType === 'death') && (chartView.outbreakChart.viewAccumType === "percChange")) {
@@ -1565,7 +1650,7 @@ function createCharts(data) {
 			//.y(function(d) { return d[outbreakAccumType] <= 0 ? 0 : y4(d[outbreakAccumType]); }); 
 			//.y(function(d) { console.log('outbreakLine: ', d[outbreakAccumType], ' -> ', y4(d[outbreakAccumType])); return d[outbreakAccumType]<=0? 0 : y4(d[outbreakAccumType]); });  //rename to y4Scale???
 			.y(function(d) { 
-				if ((chartView.outbreakChart.viewAccumType == 'cumulative') && (outbreakScaleType == 'log')) {
+				if ((['dailySmooth', 'cumulative'].includes(chartView.outbreakChart.viewAccumType)) && (outbreakScaleType == 'log')) {
 					return d[outbreakAccumType] <= 0 ? height4 + 10 : y4(d[outbreakAccumType]); 
 				} else {
 					return y4(d[outbreakAccumType]); 
@@ -1739,6 +1824,7 @@ function viewOutbreakDayAccum(type) {
 		chartView.outbreakChart.viewAccumType = type;
 		document.getElementById('outbreak-total-daily-btn').classList.add('on');
 		document.getElementById('outbreak-total-cum-btn').classList.remove('on');
+		document.getElementById('outbreak-total-dailySmooth-btn').classList.remove('on');
 		//document.getElementById('outbreak-total-percChange-btn').classList.remove('on');
 		updateOutbreakDayChart();
 	} else if (type=='cumulative' && (!(document.getElementById('outbreak-total-cum-btn').classList.contains('on')))) { 
@@ -1746,7 +1832,15 @@ function viewOutbreakDayAccum(type) {
 		chartView.outbreakChart.viewAccumType = type;
 		document.getElementById('outbreak-total-daily-btn').classList.remove('on');
 		document.getElementById('outbreak-total-cum-btn').classList.add('on');
+		document.getElementById('outbreak-total-dailySmooth-btn').classList.remove('on');
 		//document.getElementById('outbreak-total-percChange-btn').classList.remove('on');
+		updateOutbreakDayChart();
+	} else if (type=='dailySmooth' && (!(document.getElementById('outbreak-total-dailySmooth-btn').classList.contains('on')))) { 
+		//console.log('CHANGE OutbreakChart to: ', type)
+		chartView.outbreakChart.viewAccumType = type;
+		document.getElementById('outbreak-total-daily-btn').classList.remove('on');
+		document.getElementById('outbreak-total-cum-btn').classList.remove('on');
+		document.getElementById('outbreak-total-dailySmooth-btn').classList.add('on');
 		updateOutbreakDayChart();
 	// } else if (type=='percChange' && (!(document.getElementById('outbreak-total-percChange-btn').classList.contains('on')))) { 
 	// 	console.log('CHANGE OutbreakChart to: ', type)
@@ -1794,17 +1888,28 @@ function viewTimeSeriesChartBy(type) {
 
 function viewTimeSeriesAccum(type) {
 	//console.log('CLICKED ON BUTTON: ', type)
-	if (type=='daily' && document.getElementById('timeSeries-total-cum-btn').classList.contains('on')) {
-		//console.log('CHANGE timeSeriesChart to: ', type)
+	if (type=='daily' && (!(document.getElementById('timeSeries-total-daily-btn').classList.contains('on')))) {
+		//console.log('CHANGE OutbreakChart to: ', type)
 		chartView.timeSeriesChart.viewAccumType = type;
-		document.getElementById('timeSeries-total-daily-btn').classList.toggle('on');
-		document.getElementById('timeSeries-total-cum-btn').classList.toggle('on');
+		document.getElementById('timeSeries-total-daily-btn').classList.add('on');
+		document.getElementById('timeSeries-total-cum-btn').classList.remove('on');
+		document.getElementById('timeSeries-total-dailySmooth-btn').classList.remove('on');
+		//document.getElementById('timeSeries-total-percChange-btn').classList.remove('on');
 		updateTimeSeriesChart();
-	} else if (type=='cumulative' && document.getElementById('timeSeries-total-daily-btn').classList.contains('on')){ 
+	} else if (type=='cumulative' && (!(document.getElementById('timeSeries-total-cum-btn').classList.contains('on')))) { 
+		//console.log('CHANGE OutbreakChart to: ', type)
+		chartView.timeSeriesChart.viewAccumType = type;
+		document.getElementById('timeSeries-total-daily-btn').classList.remove('on');
+		document.getElementById('timeSeries-total-cum-btn').classList.add('on');
+		document.getElementById('timeSeries-total-dailySmooth-btn').classList.remove('on');
+		//document.getElementById('timeSeries-total-percChange-btn').classList.remove('on');
+		updateTimeSeriesChart();
+	} else if (type=='dailySmooth' && (!(document.getElementById('timeSeries-total-dailySmooth-btn').classList.contains('on')))) { 
 		//console.log('CHANGE timeSeriesChart to: ', type)
 		chartView.timeSeriesChart.viewAccumType = type;
-		document.getElementById('timeSeries-total-daily-btn').classList.toggle('on');
-		document.getElementById('timeSeries-total-cum-btn').classList.toggle('on');
+		document.getElementById('timeSeries-total-daily-btn').classList.remove('on');
+		document.getElementById('timeSeries-total-cum-btn').classList.remove('on');
+		document.getElementById('timeSeries-total-dailySmooth-btn').classList.add('on');
 		updateTimeSeriesChart();
 	} 
 }
@@ -2313,7 +2418,7 @@ function updateTimeSeriesChart() {
 	//console.log('timeSeriesAccumType: ', timeSeriesAccumType)
 
 	//show or hide log/linear buttons
-	if (chartView.timeSeriesChart.viewAccumType == 'cumulative') {
+	if (['dailySmooth', 'cumulative'].includes(chartView.timeSeriesChart.viewAccumType)) {
 		document.getElementById('timeSeries-scale-btns').style.display = 'inline-block';
 	} else {
 		document.getElementById('timeSeries-scale-btns').style.display = 'none';
@@ -2342,10 +2447,10 @@ function updateTimeSeriesChart() {
 	
 	let domainMax = d3.max(timeSeriesDomainArrayMax);
 	//cumulative log, value <= 5 or no values for selection:
-	if (((timeSeriesDomainArrayMax.length == 0)||(domainMax <= 5)) && (chartView.timeSeriesChart.viewAccumType == 'cumulative') && (timeSeriesScaleType == 'log')) {
+	if (((timeSeriesDomainArrayMax.length == 0)||(domainMax <= 5)) && (timeSeriesScaleType == 'log') && (['dailySmooth', 'cumulative'].includes(chartView.timeSeriesChart.viewAccumType))) {
 		y2.domain([1, 5]); 
-	//cumulative log, value > 0:
-	} else if ((timeSeriesScaleType == 'log') && (chartView.timeSeriesChart.viewAccumType == 'cumulative')) {
+	//cumulative or dailySmooth log, value > 0:
+	} else if ((timeSeriesScaleType == 'log') && (['dailySmooth', 'cumulative'].includes(chartView.timeSeriesChart.viewAccumType))) {
 		y2.domain([1, domainMax]); 
 	//value <= 5 or no values for selection - keep a min of 5 for y-axis:
 	} else if ((timeSeriesDomainArrayMax.length == 0) || (domainMax <= 5)) {
@@ -2356,19 +2461,10 @@ function updateTimeSeriesChart() {
 	//console.log('y2.domain = ', y2.domain())
 
 
-	// function numYTicks(maxY) {
-	// 	switch (maxY) {
-	// 		case 1: return 1;
-	// 		case 2: return 2;
-	// 		case 3: return 3;
-	// 		case 4: return 4;
-	// 		default: return 5;
-	// 	}			
-	// }
-	
+
 	function numYTicks(maxY) {  //ticks on y-axis
 		//console.log('numYTicks: ', maxY)
-		if (chartView.timeSeriesChart.viewAccumType == 'cumulative' && timeSeriesScaleType == 'log') {
+		if (['dailySmooth', 'cumulative'].includes(chartView.timeSeriesChart.viewAccumType) && timeSeriesScaleType == 'log') {
 			switch (true) {
 				case (maxY <= 100): return 2;
 				case (maxY <= 1000): return 2;
@@ -2422,11 +2518,21 @@ function updateTimeSeriesChart() {
 				return "rotate(-90) translate(-110, -50)" 
 			} else if ((chartView.timeSeriesChart.viewStatType === 'death') && (chartView.timeSeriesChart.viewAccumType === "cumulative")) {
 				return "rotate(-90) translate(-86, -50)" 
+			} else if ((chartView.timeSeriesChart.viewStatType === 'confirmed') && (chartView.timeSeriesChart.viewAccumType === "dailySmooth")) {
+				return "rotate(-90) translate(-110, -50)" 
+			} else if ((chartView.timeSeriesChart.viewStatType === 'death') && (chartView.timeSeriesChart.viewAccumType === "dailySmooth")) {
+				return "rotate(-90) translate(-100, -50)" 
 			} else {
 				return "" 
 			}
 		})  
-		.text(y_ts_title);	
+		.text(function() {
+			if ((chartView.timeSeriesChart.viewStatType === 'confirmed') && (chartView.timeSeriesChart.viewAccumType === "dailySmooth")) {
+				return 'Daily (smoothed) Conf Cases'; 
+			} else {
+				return y_ts_title
+			}
+		});	
 
 
 	//Define line constructor (i.e. define x,y coordinates)
@@ -2436,7 +2542,7 @@ function updateTimeSeriesChart() {
 		//.y(function(d) { return y2(d[timeSeriesAccumType]); });  //rename to y2Scale???	
 		.y(function(d) { 
 			//console.log(d[timeSeriesAccumType], y2(d[timeSeriesAccumType])); 
-			if ((chartView.timeSeriesChart.viewAccumType == 'cumulative')&& (timeSeriesScaleType == 'log')) {
+			if (['dailySmooth', 'cumulative'].includes(chartView.timeSeriesChart.viewAccumType) && (timeSeriesScaleType == 'log')) {
 				//console.log('y: ', d[currentAccumType], ' -> ', d[currentAccumType] <= 0 ? height4 : y4(d[currentAccumType]));
 				return d[timeSeriesAccumType] <= 0 ? height2 + 10 : y2(d[timeSeriesAccumType]); 
 			} else {
@@ -2597,7 +2703,7 @@ function updateOutbreakDayChart() {
 	//console.log('currentAccumType: ', currentAccumType)
 
 	
-	if (chartView.outbreakChart.viewAccumType == 'cumulative') {
+	if (['dailySmooth', 'cumulative'].includes(chartView.outbreakChart.viewAccumType)) {
 		document.getElementById('outbreak-scale-btns').style.display = 'inline-block';
 	} else {
 		document.getElementById('outbreak-scale-btns').style.display = 'none';
@@ -2619,7 +2725,7 @@ function updateOutbreakDayChart() {
 	let x4 = d3.scaleLinear().range([0, width4]); //x-axis width, accounting for specified margins
 	let y4 = function() {
 		if (chartView.outbreakChart.viewAccumType == 'daily') {
-			return d3.scaleLinear().range([height4, 0]);;
+			return d3.scaleLinear().range([height4, 0]);
 		} else {
 			switch(outbreakScaleType) {
 					case 'linear': return d3.scaleLinear().range([height4, 0]);
@@ -2645,9 +2751,9 @@ function updateOutbreakDayChart() {
 
 	//Create array of max values for each location
 	if (outbreakDomainArray.length==0) {		
-		outbreakDomainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));  //max value/cumVal/percChange for all locations
+		outbreakDomainArrayMax = data.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));  //max value/cumVal/rollAvg/percChange for all locations
 	} else {
-		outbreakDomainArrayMax = outbreakDomainArray.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));  //max value/cumVal/percChange for each selected location
+		outbreakDomainArrayMax = outbreakDomainArray.map(d => d3.max(d.values, rec => (rec.type === chartView.outbreakChart.viewStatType) ? rec[currentAccumType] : undefined)).filter(v => v != undefined && isFinite(v));  //max value/cumVal/rollAvg/percChange for each selected location
 	}
 	//console.log('outbreakDomainArrayMax: ', outbreakDomainArrayMax.length, outbreakDomainArrayMax)
 
@@ -2667,9 +2773,9 @@ function updateOutbreakDayChart() {
 	// }	
 
 	let domainMax = d3.max(outbreakDomainArrayMax);
-	if (((outbreakDomainArrayMax.length == 0)||(domainMax==0)) && (outbreakScaleType == 'log')) {
+	if (((outbreakDomainArrayMax.length == 0)||(domainMax==0)) && (outbreakScaleType == 'log') && ['dailySmooth', 'cumulative'].includes(chartView.outbreakChart.viewAccumType)) {
 		y4.domain([1, 1]); 
-	} else if ((outbreakScaleType == 'log') && (chartView.outbreakChart.viewAccumType == 'cumulative'))  {
+	} else if ((outbreakScaleType == 'log') && (['dailySmooth', 'cumulative'].includes(chartView.outbreakChart.viewAccumType)))  {
 		y4.domain([1, domainMax]); 
 	} else if (outbreakDomainArrayMax.length == 0) {
 		y4.domain([0, 0]);
@@ -2706,7 +2812,7 @@ function updateOutbreakDayChart() {
 	}
 	function numYTicks(maxY) {  //ticks on y-axis
 		//console.log('numYTicks: ', maxY)
-		if (chartView.outbreakChart.viewAccumType == 'cumulative' && outbreakScaleType == 'log') {
+		if (['dailySmooth', 'cumulative'].includes(chartView.outbreakChart.viewAccumType) && outbreakScaleType == 'log') {
 			switch (true) {
 				case (maxY <= 100): return 2;
 				case (maxY <= 1000): return 2;
@@ -2798,6 +2904,10 @@ function updateOutbreakDayChart() {
 				return "rotate(-90) translate(-190, -50)" 
 			} else if ((chartView.outbreakChart.viewStatType === 'death') && (chartView.outbreakChart.viewAccumType === "cumulative")) {
 				return "rotate(-90) translate(-165, -50)" 
+			} else if ((chartView.outbreakChart.viewStatType === 'confirmed') && (chartView.outbreakChart.viewAccumType === "dailySmooth")) {
+				return "rotate(-90) translate(-200, -50)" 
+			} else if ((chartView.outbreakChart.viewStatType === 'death') && (chartView.outbreakChart.viewAccumType === "dailySmooth")) {
+				return "rotate(-90) translate(-180, -50)" 
 			// } else if ((chartView.outbreakChart.viewStatType === 'confirmed') && (chartView.outbreakChart.viewAccumType === "percChange")) {
 			// 	return "rotate(-90) translate(-200, -50)" 
 			// } else if ((chartView.outbreakChart.viewStatType === 'death') && (chartView.outbreakChart.viewAccumType === "percChange")) {
@@ -2816,7 +2926,7 @@ function updateOutbreakDayChart() {
 			return x4(d['dayNum']); 
 		})  //rename to x4Scale???
 		.y(function(d) { 
-			if ((chartView.outbreakChart.viewAccumType == 'cumulative') && (chartView.outbreakChart.viewStatType == 'death') && (outbreakScaleType == 'log')) {
+			if ((['dailySmooth', 'cumulative'].includes(chartView.outbreakChart.viewAccumType)) && (outbreakScaleType == 'log')) {
 				//console.log('y: ', d[currentAccumType], ' -> ', d[currentAccumType] <= 0 ? height4 : y4(d[currentAccumType]));
 				return d[currentAccumType] <= 0 ? height4 + 10 : y4(d[currentAccumType]); 
 			} else {
@@ -2859,7 +2969,7 @@ function updateOutbreakDayChart() {
 			pos = selectedLocList.indexOf(d.locCode);
 			//console.log('color pos: ', pos, colors[pos])
 			//return (selectedLocList.indexOf(d.locCode) == -1) ? 0 : 2;
-			return (selectedLocList.filter(l => l != null).length==0) ? 1 : (selectedLocList.indexOf(d.locCode) == -1) ? 0 : 2;
+			return (selectedLocList.filter(l => l != null).length==0) ? 1 : (selectedLocList.indexOf(d.locCode) == -1) ? (showBackgroundOutbreakLines ? 1 : 0) : 2;
 		});
 
 	
@@ -3152,10 +3262,10 @@ function tooltip(selectedData) {
   
 	let domainMax = d3.max(timeSeriesDomainArrayMax);
 	//cumulative log, value <= 5 or no values for selection:
-	if (((timeSeriesDomainArrayMax.length == 0)||(domainMax <= 5)) && (chartView.timeSeriesChart.viewAccumType == 'cumulative') && (timeSeriesScaleType == 'log')) {
+	if (((timeSeriesDomainArrayMax.length == 0)||(domainMax <= 5)) && (timeSeriesScaleType == 'log') && (['dailySmooth', 'cumulative'].includes(chartView.timeSeriesChart.viewAccumType))) {
 		y2.domain([1, 5]); 
-	//cumulative log, value > 0:
-	} else if ((timeSeriesScaleType == 'log') && (chartView.timeSeriesChart.viewAccumType == 'cumulative')) {
+	//cumulative or dailySmooth log, value > 0:
+	} else if ((timeSeriesScaleType == 'log') && (['dailySmooth', 'cumulative'].includes(chartView.timeSeriesChart.viewAccumType))) {
 		y2.domain([1, domainMax]); 
 	//value <= 5 or no values for selection - keep a min of 5 for y-axis:
 	} else if ((timeSeriesDomainArrayMax.length == 0) || (domainMax <= 5)) {
@@ -3291,10 +3401,10 @@ function tooltip(selectedData) {
 
 		let domainMax = d3.max(timeSeriesDomainArrayMax);
 		//cumulative log, value <= 5 or no values for selection:
-		if (((timeSeriesDomainArrayMax.length == 0)||(domainMax <= 5)) && (chartView.timeSeriesChart.viewAccumType == 'cumulative') && (timeSeriesScaleType == 'log')) {
+		if (((timeSeriesDomainArrayMax.length == 0)||(domainMax <= 5)) && (timeSeriesScaleType == 'log') && (['dailySmooth', 'cumulative'].includes(chartView.timeSeriesChart.viewAccumType))) {
 			y2.domain([1, 5]); 
-		//cumulative log, value > 0:
-		} else if ((timeSeriesScaleType == 'log') && (chartView.timeSeriesChart.viewAccumType == 'cumulative')) {
+		//cumulative or dailySmooth log, value > 0:
+		} else if ((timeSeriesScaleType == 'log') && (['dailySmooth', 'cumulative'].includes(chartView.timeSeriesChart.viewAccumType))) {
 			y2.domain([1, domainMax]); 
 		//value <= 5 or no values for selection - keep a min of 5 for y-axis:
 		} else if ((timeSeriesDomainArrayMax.length == 0) || (domainMax <= 5)) {
@@ -3322,24 +3432,21 @@ function tooltip(selectedData) {
 			})  //get correct color for current location
 			.attr("r", 2.5)
 			.merge(circles)
-			// .attr("cy", function(e) {
-			// 				//console.log('e: ', e); 
-			// 				let val = e.values.find(v => (sameDay(v.date, x0) && v.type === chartView.timeSeriesChart.viewStatType))[timeSeriesAccumType];
-			// 				return y2(val)
-			// 			})
-			// .attr("cx", x2(x0));
 			.attr("cy", function(e) {
 							//console.log('e: ', e.values, x0); 
 							let val = e.values.find(v => (sameDay(v.date, x0) && v.type===chartView.timeSeriesChart.viewStatType))
+							//console.log('cy', e.locCode, val, val[timeSeriesAccumType])
 							if (val==null) return null;
-							else if ((chartView.timeSeriesChart.viewAccumType=='cumulative' && timeSeriesScaleType=='log') && (val[timeSeriesAccumType]==0)) return null;
+							if (val[timeSeriesAccumType]==null) return null;
+							else if (['dailySmooth', 'cumulative'].includes(chartView.timeSeriesChart.viewAccumType) && timeSeriesScaleType=='log' && (val[timeSeriesAccumType]==0)) return null;
 							else return y2(val[timeSeriesAccumType])
-						})
+						})			
 			.attr("cx", x2(x0))
 			.style("opacity", function(d) {		//if the value is null (i.e. no outbreak) then hide the circle
 							let val = d.values.find(v => (sameDay(v.date, x0) && v.type===chartView.timeSeriesChart.viewStatType))
 							if (val==null) return 0;
-							else if ((chartView.timeSeriesChart.viewAccumType=='cumulative' && timeSeriesScaleType=='log') && (val[timeSeriesAccumType]==0)) return 0;
+							if (val[timeSeriesAccumType]==null) return 0;
+							else if (['dailySmooth', 'cumulative'].includes(chartView.timeSeriesChart.viewAccumType) && timeSeriesScaleType=='log' && (val[timeSeriesAccumType]==0)) return 0;
 							else return 1;
 						})
 
@@ -3368,6 +3475,8 @@ function tooltip(selectedData) {
 			//console.log('values: ', values)
 			let val = values.find(v => sameDay(v.date, date) && v.type === chartView.timeSeriesChart.viewStatType);
 			if (val==undefined) return 'NA';
+			if (timeSeriesAccumType == 'rollAvg') return d3.format(",.0f")(val[timeSeriesAccumType]);
+			//console.log('return ', formatNumber(val[timeSeriesAccumType]));
 			return formatNumber(val[timeSeriesAccumType]);
 		}
 
@@ -3447,9 +3556,9 @@ function obTooltip(outbreakData) {
 	// }
 	//console.log('y4.domain = ', y4.domain())
 	let domainMax = d3.max(outbreakDomainArrayMax);
-	if (((outbreakDomainArrayMax.length == 0)||(domainMax==0)) && (outbreakScaleType == 'log')) {
+	if (((outbreakDomainArrayMax.length == 0)||(domainMax==0)) && (outbreakScaleType == 'log') && ['dailySmooth', 'cumulative'].includes(chartView.outbreakChart.viewAccumType)) {
 		y4.domain([1, 1]); 
-	} else if ((outbreakScaleType == 'log') && (chartView.outbreakChart.viewAccumType == 'cumulative'))  {
+	} else if ((outbreakScaleType == 'log') && (['dailySmooth', 'cumulative'].includes(chartView.outbreakChart.viewAccumType)))  {
 		y4.domain([1, domainMax]); 
 	} else if (outbreakDomainArrayMax.length == 0) {
 		y4.domain([0, 0]);
@@ -3636,9 +3745,9 @@ function obTooltip(outbreakData) {
 		// }
 		//console.log('y4.domain = ', y4.domain())
 		let domainMax = d3.max(outbreakDomainArrayMax);
-		if (((outbreakDomainArrayMax.length == 0)||(domainMax==0)) && (outbreakScaleType == 'log')) {
+		if (((outbreakDomainArrayMax.length == 0)||(domainMax==0)) && (outbreakScaleType == 'log') && ['dailySmooth', 'cumulative'].includes(chartView.outbreakChart.viewAccumType)) {
 			y4.domain([1, 1]); 
-		} else if ((outbreakScaleType == 'log') && (chartView.outbreakChart.viewAccumType == 'cumulative')) {
+		} else if ((outbreakScaleType == 'log') && (['dailySmooth', 'cumulative'].includes(chartView.outbreakChart.viewAccumType))) {
 			y4.domain([1, domainMax]); 
 		} else if (outbreakDomainArrayMax.length == 0) {
 			y4.domain([0, 0]);
@@ -3669,7 +3778,8 @@ function obTooltip(outbreakData) {
 							let val = e.values.find(v => (v.dayNum == x0 && v.type===chartView.outbreakChart.viewStatType))
 							//console.log('cy: ', val, currentAccumType, val[currentAccumType], y4(val[currentAccumType]))
 							if (val==null) return null;
-							else if ((chartView.outbreakChart.viewAccumType=='cumulative' && outbreakScaleType=='log') && (val[currentAccumType]==0)) return null;
+							if (val[currentAccumType]==null) return null;
+							else if ((['dailySmooth', 'cumulative'].includes(chartView.outbreakChart.viewAccumType) && outbreakScaleType=='log') && (val[currentAccumType]==0)) return null;
 							else return y4(val[currentAccumType])
 							// let val = e.values.find(v => (v.dayNum == x0 && v.type===chartView.outbreakChart.viewStatType)).value;
 							// return y4(val.value);
@@ -3678,7 +3788,8 @@ function obTooltip(outbreakData) {
 			.style("opacity", function(d) {		//if the value is null (i.e. no outbreak) then hide the circle
 							let val = d.values.find(v => (v.dayNum == x0 && v.type===chartView.outbreakChart.viewStatType))
 							if (val==null) return 0;
-							else if ((chartView.outbreakChart.viewAccumType=='cumulative' && outbreakScaleType=='log') && (val[currentAccumType]==0)) return 0;
+							if (val[currentAccumType]==null) return 0;
+							else if ((['dailySmooth', 'cumulative'].includes(chartView.outbreakChart.viewAccumType) && outbreakScaleType=='log') && (val[currentAccumType]==0)) return 0;
 							else return 1;
 						})
 
@@ -3715,7 +3826,7 @@ function obTooltip(outbreakData) {
 			if ((val==undefined) && (dayNum >= maxLocDayNum)) return 'NA'; // '?'
 			else if (val==undefined) return 'No outbreak';
 			//console.log('GET VALUE: ', val[currentAccumType], formatNumber(val[currentAccumType]))
-			//if (currentAccumType == 'percChange') return d3.format(",.2%")(val[currentAccumType]);
+			if (currentAccumType == 'rollAvg') return d3.format(",.0f")(val[currentAccumType]);
 			return formatNumber(val[currentAccumType]) + ' (' + formatDate(val.date, 'daymonth') + ')';
 		}
 
