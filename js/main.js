@@ -41,7 +41,7 @@ const screenHeight = screen.availHeight;
 let dataFormat = 'hdx';   //hdx / rk
 let dataSource = 'John Hopkins University Center for Systems Science and Engineering (JHU CCSE)';
 
-let outbreakDay1Num = 10;
+let outbreakDay1Num = 20;
 let outbreakDay1Type = 'confirmed';  // type = confirmed/death
 let outbreakNumDaysUnfulfilledForEndDay = 14;  //i.e. 2 weeks incubation
 //let outbreakDay1MaxNumForDropdown= 20;
@@ -165,9 +165,9 @@ let width5 = svgDimensions[id5].width - margin[id5].left - margin[id5].right, //
 
 
 function processHDXData(origConfCasesData, origDeathsData) {
-	console.log('-------------- PROCESS HDX DATA: -----------------')
-	console.log('original ConfCasesData in processData: ', origConfCasesData)
-	console.log('original DeathsData in processData: ', origDeathsData)
+	// console.log('-------------- PROCESS HDX DATA: -----------------')
+	// console.log('original ConfCasesData in processData: ', origConfCasesData)
+	// console.log('original DeathsData in processData: ', origDeathsData)
 	let processedData = [];
 	let locCode, currentLocCode;
 	let temp;
