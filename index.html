@@ -50,8 +50,8 @@
 				<p class="heading">1. Select locations to compare:</p>
 				<p class='instruction'>Click on bars to <b>select</b> or <b>de-select</b> locations <i>(scroll to see all locations in lower chart)</i></p>
 				<div id="loc-type-btns">
-					<button id="loc-type-death-btn" class="button custom-btn custom-btn-2" onclick="viewLocChartBy('death')">Deaths</button>
-					<button id="loc-type-conf-btn" class="button custom-btn custom-btn-1 on" onclick="viewLocChartBy('confirmed')">Confirmed Cases</button>		
+					<button id="loc-type-death-btn" class="button custom-btn custom-btn-2of2" onclick="viewLocChartBy('death')">Total Deaths</button>
+					<button id="loc-type-conf-btn" class="button custom-btn custom-btn-1of2 on" onclick="viewLocChartBy('confirmed')">Total Confirmed Cases</button>		
 				</div>
 
 				<div class="dropdown">
@@ -76,12 +76,13 @@
 				<div class="ob-button-group">
 					<div id="outbreak-total-btns">
 						<!-- <button id="outbreak-total-percChange-btn" class="button custom-btn custom-btn-3" onclick="viewOutbreakDayAccum('percChange')">Percentage Change</button>		 -->
-						<button id="outbreak-total-cum-btn" class="button custom-btn custom-btn-2" onclick="viewOutbreakDayAccum('cumulative')">Cumulative</button>		
-						<button id="outbreak-total-daily-btn" class="button custom-btn custom-btn-1 on" onclick="viewOutbreakDayAccum('daily')">Daily</button>		
+						<button id="outbreak-total-cum-btn" class="button custom-btn custom-btn-3of3" title="Cumulative values for each day" onclick="viewOutbreakDayAccum('cumulative')">Cumulative</button>		
+						<button id="outbreak-total-dailySmooth-btn" class="button custom-btn custom-btn-2of3 on" title="Daily values smoothed with 7-day rolling average" onclick="viewOutbreakDayAccum('dailySmooth')">Daily (smoothed)</button>
+						<button id="outbreak-total-daily-btn" class="button custom-btn custom-btn-1of3" title="Daily values" onclick="viewOutbreakDayAccum('daily')">Daily</button>		
 					</div>
 					<div id="outbreak-type-btns">
-						<button id="outbreak-type-death-btn" class="button custom-btn custom-btn-2" onclick="viewOutbreakChartBy('death')">Deaths</button>
-						<button id="outbreak-type-conf-btn" class="button custom-btn custom-btn-1 on" onclick="viewOutbreakChartBy('confirmed')">Confirmed Cases</button>		
+						<button id="outbreak-type-death-btn" class="button custom-btn custom-btn-2of2" onclick="viewOutbreakChartBy('death')">Deaths</button>
+						<button id="outbreak-type-conf-btn" class="button custom-btn custom-btn-1of2 on" onclick="viewOutbreakChartBy('confirmed')">Confirmed Cases</button>		
 					</div>
 				</div>
 				<div id="outbreakDay-chart">
@@ -99,12 +100,13 @@
 			<div id="timeSeriesChartGroup" class="col-12 col-sm-12">
 				<div class="tS-button-group">
 					<div id="timeSeries-total-btns">
-						<button id="timeSeries-total-cum-btn" class="button custom-btn custom-btn-2" onclick="viewTimeSeriesAccum('cumulative')">Cumulative</button>		
-						<button id="timeSeries-total-daily-btn" class="button custom-btn custom-btn-1 on" onclick="viewTimeSeriesAccum('daily')">Daily</button>		
+						<button id="timeSeries-total-cum-btn" class="button custom-btn custom-btn-3of3" title="Cumulative values for each day" onclick="viewTimeSeriesAccum('cumulative')">Cumulative</button>		
+						<button id="timeSeries-total-dailySmooth-btn" class="button custom-btn custom-btn-2of3 on" title="Daily values smoothed with 7-day rolling average" onclick="viewTimeSeriesAccum('dailySmooth')">Daily (smoothed)</button>
+						<button id="timeSeries-total-daily-btn" class="button custom-btn custom-btn-1of3" title="Daily values" onclick="viewTimeSeriesAccum('daily')">Daily</button>		
 					</div>	
 					<div id="timeSeries-type-btns">
-						<button id="timeSeries-type-death-btn" class="button custom-btn custom-btn-2" onclick="viewTimeSeriesChartBy('death')">Deaths</button>
-						<button id="timeSeries-type-conf-btn" class="button custom-btn custom-btn-1 on" onclick="viewTimeSeriesChartBy('confirmed')">Confirmed Cases</button>		
+						<button id="timeSeries-type-death-btn" class="button custom-btn custom-btn-2of2" onclick="viewTimeSeriesChartBy('death')">Deaths</button>
+						<button id="timeSeries-type-conf-btn" class="button custom-btn custom-btn-1of2 on" onclick="viewTimeSeriesChartBy('confirmed')">Confirmed Cases</button>		
 					</div>
 				</div>
 				<div id="timeseries-chart">
